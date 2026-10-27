@@ -1,0 +1,142 @@
+[
+  {
+    "id": "lvl1_q1",
+    "level": 1,
+    "text": "Une créature pétrifiée tient une clé USB rouillée étiquetée 'CONFIDENTIEL'. Que dois-tu faire ?",
+    "choices": [
+      "La brancher immédiatement pour inspecter son contenu",
+      "Ne pas la brancher et l'isoler (risque de BadUSB / malware)",
+      "La formater rapidement sur un poste de travail du labyrinthe",
+      "Demander à l'entité si elle contient le mot de passe de sortie"
+    ],
+    "correctAnswer": 1,
+    "points": 60,
+    "explanation": "Ne jamais brancher de clé USB inconnue : elle peut exécuter du code malveillant au niveau matériel (BadUSB) ou infecter le système."
+  },
+  {
+    "id": "lvl1_q2",
+    "level": 1,
+    "text": "L'entité te tend un message sanglant : 'URGENT : Ton compte expire dans 5 minutes, clique ici pour réinitialiser ton mot de passe'. C'est :",
+    "choices": [
+      "Une notification système légitime du labyrinthe",
+      "Une tentative d'hameçonnage (Phishing) par manipulation psychologique d'urgence",
+      "Une mise à jour automatique de sécurité de Windows",
+      "Un message de bienvenue des administrateurs du jeu"
+    ],
+    "correctAnswer": 1,
+    "points": 60,
+    "explanation": "L'urgence artificielle et la demande d'action immédiate sont les signatures typiques d'une campagne de phishing."
+  },
+  {
+    "id": "lvl2_q1",
+    "level": 2,
+    "text": "Un panneau clignote dans le noir : 'FREE_LABYRINTH_WIFI (Réseau Ouvert)'. Quel est le risque majeur ?",
+    "choices": [
+      "Le réseau va faire exploser la carte Wi-Fi de ton ordinateur",
+      "Un attaquant sur le même réseau peut intercepter le trafic non chiffré (Sniffing / Eavesdropping)",
+      "La batterie de ton équipement va se recharger trop vite",
+      "Il n'y a aucun risque tant que tu navigues en mode privé"
+    ],
+    "correctAnswer": 1,
+    "points": 80,
+    "explanation": "Sur un réseau Wi-Fi public ouvert sans chiffrement WPA, tout attaquant à proximité peut intercepter ou manipuler les flux non protégés."
+  },
+  {
+    "id": "lvl2_q2",
+    "level": 2,
+    "text": "L'entité te bloque le passage : 'Quel mécanisme empêche un pirate d'accéder à ton compte même s'il vole ton mot de passe ?'",
+    "choices": [
+      "Changer le fond d'écran de son bureau",
+      "L'authentification multi-facteurs (MFA / 2FA)",
+      "Vider l'historique du navigateur web",
+      "Désactiver la webcam de son ordinateur"
+    ],
+    "correctAnswer": 1,
+    "points": 80,
+    "explanation": "Le MFA requiert au moins deux facteurs distincts (ce que l'on sait, ce que l'on a, ce que l'on est), neutralisant le simple vol de mot de passe."
+  },
+  {
+    "id": "lvl3_q1",
+    "level": 3,
+    "text": "Un écran s'allume subitement : tous tes fichiers sont renommés en '.locked' avec un compte à rebours et une demande de rançon en cryptomonnaie. De quelle menace s'agit-il ?",
+    "choices": [
+      "Un Spyware (logiciel espion passif)",
+      "Un Ransomware (rançongiciel avec chiffrement asymétrique des données)",
+      "Un simple bug d'affichage graphique de Windows",
+      "Une défragmentation du disque dur par l'OS"
+    ],
+    "correctAnswer": 1,
+    "points": 100,
+    "explanation": "Le ransomware chiffre les données de la victime et exige une rançon en échange de la clé de déchiffrement."
+  },
+  {
+    "id": "lvl3_q2",
+    "level": 3,
+    "text": "Une voix synthétique au téléphone prétend être le support informatique et exige que tu lui lises le code SMS que tu viens de recevoir. C'est :",
+    "choices": [
+      "Une procédure standard d'assistance technique",
+      "Une attaque par ingénierie sociale (Vishing / Voice Phishing) pour contourner le 2FA",
+      "Un test de débit de la ligne téléphonique",
+      "Un appel automatique du FAI pour calibrer ton modem"
+    ],
+    "correctAnswer": 1,
+    "points": 100,
+    "explanation": "Le vishing consiste à manipuler verbalement la cible pour lui soutirer des codes de sécurité ou des identifiants confidentiels."
+  },
+  {
+    "id": "lvl4_q1",
+    "level": 4,
+    "text": "Sur le terminal d'une porte blindée, tu découvres que saisir `' OR '1'='1` dans le champ d'identifiant déverrouille l'accès. Quelle est cette faille ?",
+    "choices": [
+      "Une attaque par Buffer Overflow (dépassement de tampon)",
+      "Une Injection SQL (SQLi) causée par une concaténation brute des entrées utilisateur",
+      "Une attaque par déni de service distribué (DDoS)",
+      "Un certificat SSL expiré sur le serveur distant"
+    ],
+    "correctAnswer": 1,
+    "points": 120,
+    "explanation": "L'injection SQL altère la logique de la requête en injectant des métacaractères SQL lorsque les requêtes préparées (paramétrées) ne sont pas utilisées."
+  },
+  {
+    "id": "lvl4_q2",
+    "level": 4,
+    "text": "En ouvrant une console, ton navigateur t'affiche une alerte rouge criante : 'Le certificat d'autorité de ce site est auto-signé et invalide'. Quel type d'attaque peut être en cours ?",
+    "choices": [
+      "Une attaque Man-in-the-Middle (MitM) interceptant et déchiffrant ton trafic TLS",
+      "Une panne du ventilateur de ton processeur",
+      "Une surcharge temporaire des serveurs DNS de Google",
+      "Un simple problème de police d'écriture dans la page HTML"
+    ],
+    "correctAnswer": 0,
+    "points": 120,
+    "explanation": "Un certificat invalide ou inconnu sur un canal supposé sécurisé signale souvent une tentative d'interception MitM (dérivation de proxy, ARP spoofing)."
+  },
+  {
+    "id": "lvl5_q1",
+    "level": 5,
+    "text": "L'entité murmure dans l'ombre : 'Qu'appelle-t-on une faille de sécurité activement exploitée avant même que l'éditeur du logiciel n'en ait connaissance ou n'ait publié de correctif ?'",
+    "choices": [
+      "Une vulnérabilité Zero-Day (0-Day)",
+      "Une attaque par force brute par dictionnaire",
+      "Un bug de régression de build Nightly",
+      "Une attaque Cross-Site Scripting stockée (Stored XSS)"
+    ],
+    "correctAnswer": 0,
+    "points": 140,
+    "explanation": "Une vulnérabilité Zero-Day désigne une faille dont l'éditeur n'a pas encore connaissance (0 jour pour se protéger) et pour laquelle aucun correctif n'existe."
+  },
+  {
+    "id": "lvl5_q2",
+    "level": 5,
+    "text": "Dernière porte avant la lumière : 'Pour stocker des mots de passe en base de données de manière hautement sécurisée contre les attaques par tables arc-en-ciel et GPU, quelle méthode est requise ?'",
+    "choices": [
+      "Chiffrement réversible en base64 dans un fichier texte",
+      "Hachage simple avec l'algorithme MD5 ou SHA-1",
+      "Hachage cryptographique robuste avec sel unique (Salt) et coût adaptatif (Argon2 / Bcrypt / PBKDF2)",
+      "Concaténer le mot de passe avec le prénom de l'administrateur système"
+    ],
+    "correctAnswer": 2,
+    "points": 140,
+    "explanation": "Le salage aléatoire unique neutralise les rainbow tables, et les fonctions lentes à coût mémoire/CPU adaptatif (Argon2, Bcrypt) résistent aux attaques GPU/ASIC."
+  }
+]
