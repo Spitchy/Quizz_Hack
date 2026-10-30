@@ -2,15 +2,17 @@ import { Canvas, useFrame } from '@react-three/fiber'
 import { memo, useMemo, useRef } from 'react'
 import { Color, type FogExp2, type HemisphereLight } from 'three'
 import type { Question } from '../api/client'
-import { beatSchedule, CCTV_STAGES, type DefeatStage, type VictoryStage } from '../app/sequence'
+import { arrivalAt, beatSchedule, CCTV_STAGES, type DefeatStage, type VictoryStage } from '../app/sequence'
 import { toEntityState, toWorldState, upsetEntities, type EntityMood } from '../game/render'
 import type { GameSnapshot } from '../game/types'
-import { planApproach } from '../maze/approach'
+import { pathLength, planApproach } from '../maze/approach'
 import type { ExitRoom } from '../maze/exitRoom'
 import { entityPlacement, tileCenter, type Maze } from '../maze/generate'
 import type { Circle } from '../maze/physics'
+import type { RadioSpot } from '../maze/radioSpot'
 import { Effects } from './Effects'
-import { entityLook, SIGN_HEIGHT, type EntityLook } from './entities/archetypes'
+import { entityLook, SIGN_HEIGHT, WALL_CLEARANCE, type EntityLook } from './entities/archetypes'
+import { breakFor } from './entities/signBreak'
 import { Entity, type DefeatRole, type Reaction } from './Entity'
 import { EYE_HEIGHT, PALETTE } from './layout'
 import { MazeWorld } from './MazeWorld'
@@ -21,7 +23,9 @@ import { createProbe } from './defeatBody'
 import { PlayerBody } from './PlayerBody'
 import { SecurityCamera } from './SecurityCamera'
 import { PlayerController, type EntityPose, type PlayerInfo } from './PlayerController'
+import { RadioCorner } from './RadioCorner'
 import { Sign } from './Sign'
+import { SoundStage } from './SoundStage'
 import { WakeRoom } from './WakeRoom'
 import { WhiteRoom, type FreedEntity } from './WhiteRoom'
 
@@ -42,6 +46,10 @@ const LIGHT = new Color('#fffaf0')
 
 export interface MazeSceneProps {
   maze: Maze
+  /** La radio et sa table, au milieu du niveau. */
+  radio: RadioSpot | null
+  /** Le joueur a le nez dans le journal : il ne bouge plus. */
+  frozen: boolean
   exitRoom: ExitRoom
   snapshot: GameSnapshot
   defeatStage: DefeatStage | null
@@ -100,6 +108,7 @@ interface EntitySlotProps {
   answer: number | null
   onHover?: (choice: number | null) => void
   onPick?: (choice: number) => void
+  maze: Maze
 }
 
 /**
@@ -107,11 +116,12 @@ interface EntitySlotProps {
  * change (celle qu'on lit, celle qui réagit) se re-rend.
  */
 const EntitySlot = memo(function EntitySlot(props: EntitySlotProps) {
-  const { look, x, z, yaw, mood, visible, smileOnly, engaged, reaction, defeat } = props
+  const { id, look, x, z, yaw, mood, visible, smileOnly, engaged, reaction, defeat } = props
   const render = useMemo(() => ({ mood, visible, smileOnly }), [mood, visible, smileOnly])
   const position = useMemo<[number, number, number]>(() => [x, 0, z], [x, z])
   return (
     <Entity
+      soundId={id}
       render={render}
       look={look}
       position={position}
@@ -125,6 +135,8 @@ const EntitySlot = memo(function EntitySlot(props: EntitySlotProps) {
             question={props.question}
             showQuestion={props.showQuestion}
             broken={props.broken}
+            breakStyle={breakFor(look)}
+            maze={props.maze}
             highlight={props.highlight}
             answer={props.answer}
             onHover={props.onHover}
@@ -158,7 +170,7 @@ function LightSurge({ active }: { active: boolean }) {
 }
 
 function MazeContents(props: MazeSceneProps) {
-  const { maze, snapshot, highlight, answer, defeatStage, victoryStage } = props
+  const { maze, radio, frozen, snapshot, highlight, answer, defeatStage, victoryStage } = props
   const { onNearEntity, onPlayerMoved, onHoverChoice, onPickChoice } = props
   const world = toWorldState(snapshot)
 
@@ -166,7 +178,7 @@ function MazeContents(props: MazeSceneProps) {
     () =>
       maze.entities.map((spot) => {
         const look = entityLook(maze.seed, spot.id)
-        return { id: spot.id, look, signY: SIGN_HEIGHT[look.archetype] * look.scale, ...entityPlacement(spot) }
+        return { id: spot.id, look, signY: SIGN_HEIGHT[look.archetype] * look.scale, ...entityPlacement(spot, WALL_CLEARANCE[look.archetype]) }
       }),
     [maze],
   )
@@ -174,6 +186,7 @@ function MazeContents(props: MazeSceneProps) {
   const obstacles: Circle[] = placements
     .filter((_, i) => slots[i].entity.visible && slots[i].entity.mood !== 'smiling')
     .map((p) => ({ ...p.position, radius: ENTITY_RADIUS }))
+  if (radio) obstacles.push(radio.obstacle)
 
   // Défaite : celles qu'on a fâchées reviennent par les couloirs et frappent, chacune son tour.
   const upset = upsetEntities(snapshot)
@@ -182,12 +195,20 @@ function MazeContents(props: MazeSceneProps) {
     const engaged = snapshot.engagedEntity
     const player = engaged !== null ? placements[engaged].reading : tileCenter(maze.spawn)
     const attackers = upset.map((id) => ({ entity: id, from: placements[id].position }))
-    const { plans, facing, stand, camera } = planApproach(maze, player, attackers)
+    const { plans, facing, stand, camera } = planApproach(maze, player, attackers, { avoid: radio?.obstacle })
     const hits = beatSchedule(upset.length)
+    // La plus proche arrive la première : le rang remplace l'ordre des erreurs.
+    const byRank = plans.map((plan) => plan).sort((a, b) => pathLength(a.path) - pathLength(b.path))
+    const fallAt = hits[Math.floor(hits.length * 0.72)]?.at ?? 0
     return {
-      plans: new Map(plans.map((plan, i) => [plan.entity, { plan, hits: hits.filter((h) => h.attacker === i).map((h) => h.at) }])),
+      plans: new Map(
+        byRank.map((plan, rank) => [
+          plan.entity,
+          { plan, hits: hits.filter((h) => h.attacker === rank).map((h) => h.at), arrival: arrivalAt(rank), fallAt },
+        ]),
+      ),
       // Chaque coup, et d'où il vient (la place de l'assaillant) : le corps recule à l'opposé.
-      bodyHits: hits.map((h) => ({ at: h.at, from: plans[h.attacker].path[plans[h.attacker].path.length - 1] })),
+      bodyHits: hits.map((h) => ({ at: h.at, from: byRank[h.attacker].path[byRank[h.attacker].path.length - 1] })),
       // Le regard du joueur se tourne vers elles ; son corps leur fait face.
       faceYaw: Math.atan2(-facing.x, -facing.z),
       bodyYaw: Math.atan2(facing.x, facing.z),
@@ -195,7 +216,7 @@ function MazeContents(props: MazeSceneProps) {
       camera,
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [maze, placements, upsetKey, snapshot.engagedEntity])
+  }, [maze, radio, placements, upsetKey, snapshot.engagedEntity])
 
   const filmed = defeatStage !== null && CCTV_STAGES.includes(defeatStage)
   const probe = useRef(createProbe())
@@ -208,7 +229,7 @@ function MazeContents(props: MazeSceneProps) {
   const defeatRoles = useMemo(() => {
     const out = new Map<number, DefeatRole>()
     if (!defeatStage) return out
-    for (const [id, role] of roles.plans) out.set(id, { stage: defeatStage, plan: role.plan, hits: role.hits, target: roles.stand })
+    for (const [id, role] of roles.plans) out.set(id, { stage: defeatStage, ...role, target: roles.stand })
     return out
   }, [roles, defeatStage])
 
@@ -225,7 +246,7 @@ function MazeContents(props: MazeSceneProps) {
         entities={placements}
         obstacles={obstacles}
         readingEntity={defeatStage ? null : snapshot.engagedEntity}
-        canMove={snapshot.phase === 'exploring'}
+        canMove={snapshot.phase === 'exploring' && !frozen}
         isEngageable={(id) => !slots[id]?.resolved}
         shake={world.shake}
         danger={world.danger}
@@ -237,6 +258,7 @@ function MazeContents(props: MazeSceneProps) {
       />
 
       <MazeWorld maze={maze} danger={world.danger} dark={world.lightsOff} surge={victoryStage === 'release' ? 1 : 0} />
+      {radio && <RadioCorner spot={radio} dark={world.lightsOff} />}
       <DreadGlow on={filmed} />
       {/* Défaite filmée : son corps, son sang, la caméra du couloir. */}
       <PlayerBody stage={defeatStage} stand={roles.stand} yaw={roles.bodyYaw} hits={roles.bodyHits} probe={probe} />
@@ -261,7 +283,9 @@ function MazeContents(props: MazeSceneProps) {
             engaged={slot.engaged}
             reaction={reactionOf(p.id)}
             defeat={defeatRoles.get(p.id) ?? null}
-            holdsSign={!defeatStage}
+            // Défaite : celle qui vient d'être fâchée finit son geste, le temps du figement.
+            holdsSign={!defeatStage || (defeatStage === 'freeze' && slot.engaged)}
+            maze={maze}
             question={slot.engaged ? snapshot.question : null}
             showQuestion={slot.sign.showQuestion}
             broken={slot.sign.broken}
@@ -312,6 +336,7 @@ function SceneContents(props: MazeSceneProps) {
       <>
         <PlayerController
           key="exit-room"
+          surface="hard"
           maze={exitRoom.maze}
           entities={NO_ENTITIES}
           obstacles={NO_OBSTACLES}
@@ -335,6 +360,7 @@ function SceneContents(props: MazeSceneProps) {
 }
 
 export function MazeScene(props: MazeSceneProps) {
+  const world = toWorldState(props.snapshot)
   return (
     <Canvas
       dpr={DPR_CEILING}
@@ -344,6 +370,13 @@ export function MazeScene(props: MazeSceneProps) {
     >
       <AdaptiveDpr />
       <DevSceneHook />
+      <SoundStage
+        maze={worldFor(props.defeatStage, props.victoryStage) === 'maze' ? props.maze : null}
+        radio={props.radio?.position ?? null}
+        danger={world.danger}
+        dark={world.lightsOff}
+        surge={props.victoryStage === 'release' ? 1 : 0}
+      />
       <SceneContents {...props} />
     </Canvas>
   )

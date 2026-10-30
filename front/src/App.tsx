@@ -1,8 +1,11 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { createGameApi, readApiConfig } from './api'
+import { preloadSounds } from './audio/bank'
+import { audioDebug, stopSounds, unlockAudio } from './audio/engine'
 import './app/app.css'
 import { DEV_TOKEN, TIMING } from './app/config'
 import { DefeatOverlay, GameOverOverlay, VictoryOverlay, VictoryScreen } from './app/endings'
+import { SoundControl } from './app/SoundControl'
 import { beatSchedule, DEFEAT_TIMELINE, DOOR_TIMELINE, useTimeline, VICTORY_TIMELINE, type DefeatStage } from './app/sequence'
 import { ErrorScreen, LoadingScreen, TitleScreen } from './app/screens'
 import {
@@ -63,6 +66,7 @@ export default function App() {
     const onKey = (e: KeyboardEvent) => {
       if (e.code !== 'Space' && e.code !== 'Enter') return
       e.preventDefault()
+      stopSounds()
       if (defeatStage) defeat.skip()
       else if (victoryKey) setSkippedVictory(victoryKey)
     }
@@ -72,6 +76,7 @@ export default function App() {
 
   useEffect(() => {
     void loadGameView()
+    preloadSounds()
   }, [])
 
   // Outil de test, absent du build de production : rejouer une étape de la défaite.
@@ -79,11 +84,24 @@ export default function App() {
   useEffect(() => {
     if (!import.meta.env.DEV) return
     const debug = window as unknown as { __qhDefeat?: (stage: string) => void }
-    debug.__qhDefeat = (stage) => jumpDefeat(stage as DefeatStage)
+    debug.__qhDefeat = (stage) => {
+      stopSounds()
+      jumpDefeat(stage as DefeatStage)
+    }
     return () => {
       delete debug.__qhDefeat
     }
   }, [jumpDefeat])
+
+  // Outil de test, absent du build de production : l'état du son, sans pouvoir l'écouter.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const debug = window as unknown as { __qhAudio?: typeof audioDebug }
+    debug.__qhAudio = audioDebug
+    return () => {
+      delete debug.__qhAudio
+    }
+  }, [])
 
   // Mémorise la session en cours pour la reprendre après un rechargement.
   useEffect(() => {
@@ -101,6 +119,8 @@ export default function App() {
   }, [game, snapshot.phase, snapshot.lastAnswer])
 
   const enter = async () => {
+    // Dans le clic : les navigateurs n'autorisent le son qu'après un geste du joueur.
+    unlockAudio()
     requestFullscreen()
     setEntered(true)
     setLaunchError(null)
@@ -112,6 +132,7 @@ export default function App() {
       setLaunchError(NO_TOKEN_ERROR)
       return
     }
+    stopSounds()
     void game.start(launch.token)
   }
 
@@ -168,6 +189,7 @@ export default function App() {
       onContextMenu={(e) => e.preventDefault()}
     >
       {content}
+      <SoundControl />
     </div>
   )
 }

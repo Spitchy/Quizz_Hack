@@ -1,7 +1,7 @@
 import { useFrame } from '@react-three/fiber'
 import { useMemo, useRef } from 'react'
 import { Vector3, type Group, type Mesh } from 'three'
-import { smoothNoise, type ArchetypeProps } from './anim'
+import { holdGrip, poseHeld, smoothNoise, type ArchetypeProps } from './anim'
 import { Arm, Ball } from './parts'
 import { createArmRig, poseArm, type ArmRig } from './rig'
 
@@ -40,6 +40,7 @@ const target = new Vector3()
 const pole = new Vector3()
 const grip = new Vector3()
 const root = new Vector3()
+const pose = new Vector3()
 
 /** Longueurs d'os : un bras au repos garde le coude plié. */
 function armLengths(from: [number, number, number], to: Vector3) {
@@ -96,6 +97,7 @@ export function FleshCluster({ look, motion, mats, sign }: ArchetypeProps) {
     if (h) {
       h.position.set(SIGN_AT.x + smoothNoise(t * 7, 1) * 0.08 * anger, SIGN_AT.y + Math.sin(t * 1.1) * 0.02 + smoothNoise(t * 8, 2) * 0.06 * anger, SIGN_AT.z)
       h.rotation.set(0, 0, smoothNoise(t * 6, 3) * 0.15 * anger)
+      poseHeld(h, m)
       h.updateMatrix()
     }
 
@@ -105,20 +107,20 @@ export function FleshCluster({ look, motion, mats, sign }: ArchetypeProps) {
     const recoil = Math.max(0, -m.attack)
     ARMS.forEach((arm, i) => {
       const rig = rigs.current[i]
-      if (arm.grip && sign && h) {
-        target.set(...arm.grip).applyMatrix4(h.matrix)
-      } else if (!arm.grip && sign) {
+      if (!arm.grip && sign) {
         const whip = Math.sin(t * 19 + i * 2) * 0.35 * anger
         target.copy(FREE_HAND).add(grip.set(Math.sin(t * 1.7) * 0.12, Math.sin(t * 1.1) * 0.15 + whip, Math.cos(t * 1.3) * 0.1 + whip * 0.5))
       } else {
         // Ramassés en arrière, puis jetés vers lui, chacun avec son décalage.
         const side = arm.from[0] < 0 ? -1 : 1
         const wave = Math.sin(t * 3 + i * 1.7) * 0.12
-        target.set(
+        pose.set(
           arm.from[0] + side * (0.25 - lash * 0.2) + wave,
           arm.from[1] + 0.5 + recoil * 0.35 - lash * 0.15 + Math.sin(t * 2.2 + i) * 0.08,
           arm.from[2] + 0.25 - recoil * 0.35 + lash * 0.9,
         )
+        if (arm.grip && sign && h) holdGrip(target, grip.set(...arm.grip), h, m, pose)
+        else target.copy(pose)
       }
       pole.set(arm.from[0] * 3, arm.from[1] + 0.4, arm.from[2] - 0.6)
       poseArm(rig, target, pole)

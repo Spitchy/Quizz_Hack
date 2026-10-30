@@ -107,7 +107,9 @@ function stepBlood(
     const dx = origin.x - hit.from.x
     const dz = origin.z - hit.from.z
     const len = Math.hypot(dx, dz) || 1
-    for (let n = 0; n < PER_HIT; n++) {
+    // Partagé entre tous les coups : les premières gouttes restent au sol jusqu'au bout.
+    const drops = Math.min(PER_HIT, Math.floor(DROPS / hits.length))
+    for (let n = 0; n < drops; n++) {
       const i = s.next
       s.next = (s.next + 1) % DROPS
       const spread = Math.random()

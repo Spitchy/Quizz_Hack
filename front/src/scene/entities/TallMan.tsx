@@ -3,7 +3,7 @@ import { useRef } from 'react'
 import { Vector3, type Group, type Mesh } from 'three'
 import { Arm, Ball, Limb } from './parts'
 import { createArmRig, poseArm } from './rig'
-import { lerp, twitch, type ArchetypeProps } from './anim'
+import { holdGrip, lerp, poseHeld, twitch, type ArchetypeProps } from './anim'
 
 // « Le Long » : silhouette noire filiforme, tête en œuf, yeux pâles.
 // Colère : le cou s'étire vers le plafond, la tête se tord d'un côté à l'autre
@@ -21,6 +21,7 @@ const GRIP_R = new Vector3(0.61, 0.06, 0.02)
 
 const target = new Vector3()
 const pole = new Vector3()
+const pose = new Vector3()
 
 export function TallMan({ look, motion, mats, sign }: ArchetypeProps) {
   const legL = useRef<Group>(null)
@@ -55,16 +56,21 @@ export function TallMan({ look, motion, mats, sign }: ArchetypeProps) {
     torso.current.rotation.set(0.05 + anger * 0.18 + strike * 0.35 + Math.min(0, m.attack) * 0.12, 0, Math.sin(t * 0.7) * 0.03 * (1 - anger))
     if (pelvis.current) pelvis.current.position.y = Math.abs(Math.sin(m.walkPhase)) * 0.05 * m.walk
 
-    // Cou qui s'étire, tête qui se tord par saccades (rapides, mais jamais d'une image à l'autre).
-    const stretch = 1 + anger * (1.2 + 1.2 * m.fresh)
+    // Cou qui s'étire vers le joueur (il touche déjà le plafond), tête qui se tord
+    // par saccades (rapides, mais jamais d'une image à l'autre).
+    const stretch = 1 + anger * (0.9 + 0.9 * m.fresh)
+    const reach = anger * (0.7 + 0.5 * m.fresh)
     neck.current.scale.y = stretch
-    head.current.position.y = NECK_BASE + 0.22 * stretch + 0.13
+    neck.current.rotation.x = reach
+    head.current.position.y = NECK_BASE + Math.cos(reach) * 0.22 * stretch + 0.13
+    head.current.position.z = 0.08 + Math.sin(reach) * 0.22 * stretch
     const snap = twitch(t * 6, 3, 0.4) * 1.4 * anger
     head.current.rotation.set(Math.sin(t * 0.4) * 0.04, m.lookYaw, snap + m.menace * 0.35)
 
     // Panneau : tenu à deux mains, levé et secoué à la colère.
     h.position.set(SIGN_AT.x + twitch(t * 9, 5) * 0.05 * anger, SIGN_AT.y + anger * 0.16, SIGN_AT.z + anger * 0.06)
     h.rotation.set(-anger * 0.2, 0, twitch(t * 8, 7) * 0.16 * anger)
+    poseHeld(h, m)
     h.updateMatrix()
 
     // Bras : les mains suivent les bords du panneau ; sans panneau, elles frappent.
@@ -72,14 +78,12 @@ export function TallMan({ look, motion, mats, sign }: ArchetypeProps) {
       [armL.current, GRIP_L, -1],
       [armR.current, GRIP_R, 1],
     ] as const) {
-      if (sign) {
-        target.copy(grip).applyMatrix4(h.matrix)
-      } else {
-        // Armé : mains au-dessus de la tête ; impact : abattues devant lui.
-        const raise = Math.max(0, -m.attack)
-        target.set(side * lerp(0.42, 0.22, raise), lerp(lerp(1.45, 2.7, raise), 1.25, strike), lerp(lerp(0.25, 0.05, raise), 0.95, strike))
-        target.x += Math.sin(t * 1.3 + side) * 0.03
-      }
+      // Armé : mains au-dessus de la tête ; impact : abattues devant lui.
+      const raise = Math.max(0, -m.attack)
+      pose.set(side * lerp(0.42, 0.22, raise), lerp(lerp(1.45, 2.55, raise), 1.25, strike), lerp(lerp(0.25, 0.05, raise), 0.95, strike))
+      pose.x += Math.sin(t * 1.3 + side) * 0.03
+      if (sign) holdGrip(target, grip, h, m, pose)
+      else target.copy(pose)
       pole.set(side * 0.9, 1.5, -0.5)
       poseArm(rig, target, pole)
     }

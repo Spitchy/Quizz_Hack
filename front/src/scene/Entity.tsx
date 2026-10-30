@@ -2,6 +2,7 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react'
 import { Color, MeshBasicMaterial, MeshStandardMaterial, Vector3, type Group } from 'three'
 import { APPROACH_SECONDS, type DefeatStage } from '../app/sequence'
+import { playEntityStep, reportEntity } from '../audio/stage'
 import type { EntityRender } from '../game/render'
 import { pathLength, pointAlong, type ApproachPlan } from '../maze/approach'
 import type { Archetype, EntityLook } from './entities/archetypes'
@@ -11,12 +12,12 @@ import { Disintegration } from './entities/Disintegration'
 import { sampleCloud, type ParticleCloud } from './entities/particles'
 import { FleshCluster } from './entities/FleshCluster'
 import { Mannequin } from './entities/Mannequin'
+import { breakFor, writeGesture } from './entities/signBreak'
 import {
   angerTarget,
   attackEnvelope,
   clamp01,
   damp,
-  ease,
   getTeethTexture,
   initialMotion,
   type ArchetypeProps,
@@ -55,12 +56,22 @@ const ANGRY_EYES = new Color(PALETTE.danger).multiplyScalar(2.4)
 /** Au-delà, le brouillard (densité 0,12) a tout avalé : inutile de la dessiner. */
 const CULL_DISTANCE = 20
 const toCamera = new Vector3()
+/** Vitesse de course vers le joueur (m/s) : elle part d'autant plus tard qu'elle est près. */
+const CHARGE_SPEED = 3.4
+/** Elle frappe à cette distance de lui : plus loin, elle fait un pas pour l'atteindre (m). */
+const STRIKE_REACH = 0.72
+/** Accélère jusqu'au bout : elle arrive lancée, sans ralentir. */
+const charge = (k: number) => k * k * (2 - k)
 
 export interface DefeatRole {
   stage: DefeatStage
   plan: ApproachPlan
   /** Instants (s, depuis le début du passage à tabac) où cette entité frappe. */
   hits: number[]
+  /** Instant où elle arrive sur lui (s, depuis le début du passage à tabac). */
+  arrival: number
+  /** Instant où il est à terre : elle se penche pour continuer. */
+  fallAt: number
   /** Le joueur (son corps, là où il a reculé) : elles s'y tournent et le fixent. */
   target: { x: number; z: number }
 }
@@ -79,6 +90,8 @@ interface EntityProps {
   defeat?: DefeatRole | null
   /** Victoire : silhouette translucide qui laisse passer le joueur. */
   ghost?: boolean
+  /** Identifiant pour le son : sans lui, l'entité est muette (les ombres de la pièce blanche). */
+  soundId?: number
   sign: ReactNode
 }
 
@@ -96,11 +109,13 @@ export function Entity({
   reaction = 'none',
   defeat = null,
   ghost = false,
+  soundId,
   sign,
 }: EntityProps) {
   const root = useRef<Group>(null)
   const body = useRef<Group>(null)
   const motion = useRef(initialMotion())
+  const breakStyle = useMemo(() => breakFor(look), [look])
   const [cloud, setCloud] = useState<ParticleCloud | null>(null)
 
   const mats = useMemo<EntityMaterials>(() => {
@@ -134,6 +149,9 @@ export function Entity({
     approachStart: 0,
     beatStart: 0,
     walked: 0,
+    footfall: 0,
+    /** Instant de la mauvaise réponse : le geste qui détruit le panneau part de là. */
+    brokeAt: null as number | null,
     placed: false,
     springs: {
       look: { value: 0, velocity: 0 },
@@ -142,6 +160,8 @@ export function Entity({
       menace: { value: 0, velocity: 0 },
       walk: { value: 0, velocity: 0 },
       heading: { value: rotationY, velocity: 0 },
+      lunge: { value: 0, velocity: 0 },
+      stoop: { value: 0, velocity: 0 },
     },
   })
 
@@ -162,6 +182,7 @@ export function Entity({
       if (st.wasVisible && !cloud) setCloud(sampleCloud(b, r, ghost ? '#6f6a61' : look.palette.body, ghost ? 0 : 0.3))
       st.wasVisible = false
       b.visible = false
+      if (soundId !== undefined) reportEntity(soundId, look.archetype, r.position.x, r.position.z, 'calm', false, t)
       return
     }
     st.wasVisible = true
@@ -170,7 +191,9 @@ export function Entity({
     if (reaction !== st.reaction) {
       st.reaction = reaction
       st.reactionStart = t
+      if (reaction === 'wrong' && st.brokeAt === null) st.brokeAt = t
     }
+    writeGesture(m, breakStyle, st.brokeAt === null ? null : t - st.brokeAt)
     const since = t - st.reactionStart
     m.mood = render.mood === 'angry' ? 'angry' : render.mood === 'smiling' || defeat ? 'menace' : 'calm'
     m.angerSince = reaction === 'wrong' ? since : null
@@ -193,30 +216,46 @@ export function Entity({
       }
       const path = defeat.plan.path
       const total = pathLength(path)
-      let dist = 0
-      if (defeat.stage === 'approach') {
-        const travel = Math.max(0.5, APPROACH_SECONDS - defeat.plan.delay - 0.8)
-        const k = clamp01((t - st.approachStart - defeat.plan.delay) / travel)
-        // Elles se mettent en marche, pressent le pas, et ralentissent pour s'arrêter pile à leur place.
-        dist = total * ease(k)
-      } else if (defeat.stage !== 'freeze') {
-        // Retardataire : elle finit son chemin en marchant, jamais d'un bond.
-        dist = Math.min(total, st.walked + dt * 2.6)
-      }
+      // Une seule horloge pour la course et les coups, en secondes depuis le début du passage à tabac.
+      const clock =
+        defeat.stage === 'freeze' ? -Infinity : defeat.stage === 'approach' ? t - st.approachStart - APPROACH_SECONDS : t - st.beatStart
+      // Elle court, part juste à temps et arrive lancée à l'instant où le passage à tabac la réclame.
+      const available = APPROACH_SECONDS + defeat.arrival
+      const travel = Math.min(available, Math.max(0.4, total / CHARGE_SPEED))
+      const k = clamp01((clock + APPROACH_SECONDS - (available - travel)) / travel)
+      const dist = Math.max(st.walked, total * charge(k))
       const speed = Math.max(0, dist - st.walked) / Math.max(dt, 1e-3)
       walking = Math.min(1, speed / 0.6)
       m.walkPhase += Math.max(0, dist - st.walked) * 3.2
+      // Un pied touche le sol à chaque demi-cycle de marche.
+      const footfall = Math.floor(m.walkPhase / Math.PI)
+      if (footfall !== st.footfall) {
+        st.footfall = footfall
+        if (soundId !== undefined) playEntityStep(look.archetype, r.position.x, r.position.z)
+      }
       st.walked = dist
       const at = pointAlong(path, dist)
-      r.position.set(at.x, 0, at.z)
+      // Le geste commence dans la foulée : elle arme son coup en arrivant.
+      if (clock > -2) m.attack = attackEnvelope(defeat.hits, clock)
+      // Trop loin pour l'atteindre : elle fait un pas dans le coup, puis revient.
+      const toX = defeat.target.x - at.x
+      const toZ = defeat.target.z - at.z
+      const gap = Math.hypot(toX, toZ) || 1
+      const strike = Math.max(0, m.attack)
+      const lunge = damp(sp.lunge, strike * Math.max(0, gap - STRIKE_REACH), 0.05, dt)
+      r.position.set(at.x + (toX / gap) * lunge, 0, at.z + (toZ / gap) * lunge)
       // En marche, face au chemin ; arrivée, elle se tourne vers le joueur.
-      heading = walking > 0.2 && dist < total - 0.05 ? at.heading : Math.atan2(defeat.target.x - at.x, defeat.target.z - at.z)
-      if (defeat.stage === 'beat' || defeat.stage === 'knockout') m.attack = attackEnvelope(defeat.hits, t - st.beatStart)
+      heading = walking > 0.2 && dist < total - 0.05 ? at.heading : Math.atan2(toX, toZ)
+      // Il est à terre : elle se penche sur lui pour continuer.
+      const down = clamp01((clock - defeat.fallAt) / 0.7)
+      b.rotation.x = damp(sp.stoop, down * (0.3 + 0.4 * strike), 0.1, dt)
     } else {
       st.stage = null
       st.walked = 0
+      b.rotation.x = 0
       r.position.set(position[0], 0, position[2])
     }
+    if (soundId !== undefined) reportEntity(soundId, look.archetype, r.position.x, r.position.z, m.mood, true, t)
     m.walk = damp(sp.walk, walking, 0.18, dt)
     // Rotation amortie, par le plus court chemin.
     if (!st.placed) sp.heading.value = heading

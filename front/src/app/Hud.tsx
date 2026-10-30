@@ -49,11 +49,13 @@ export interface HudProps {
   signal: number
   /** Une entité est à portée : on peut lire son panneau. */
   canEngage: boolean
+  /** Le journal de la table est à portée. */
+  canRead: boolean
   /** La souris pilote le regard (pointer lock actif). */
   mouseLook: boolean
 }
 
-export function Hud({ hud, snapshot, danger, signal, canEngage, mouseLook }: HudProps) {
+export function Hud({ hud, snapshot, danger, signal, canEngage, canRead, mouseLook }: HudProps) {
   const critical = hud.infectionPercent >= 50
   // Le bruit permanent n'apparaît qu'à partir de la moitié de l'infection.
   const noise = critical ? (danger - 0.4) * 0.12 : 0
@@ -66,6 +68,7 @@ export function Hud({ hud, snapshot, danger, signal, canEngage, mouseLook }: Hud
 
   let hint: string | null = null
   if (exploring && canEngage) hint = '[E] LIRE LE PANNEAU'
+  else if (exploring && canRead) hint = '[E] LIRE LE JOURNAL'
   else if (exploring && !mouseLook) hint = '[ZQSD/FLÈCHES] AVANCER · [CLIC] REGARDER À LA SOURIS · [MAJ] COURIR'
   else if (exploring) hint = '[ZQSD] AVANCER · [MAJ] COURIR · [ÉCHAP] LIBÉRER LA SOURIS'
   else if (snapshot.phase === 'question' && !log) hint = '[1-4] RÉPONDRE · [↑↓] VISER · [ENTRÉE] VALIDER · [ÉCHAP] RECULER'
@@ -85,7 +88,7 @@ export function Hud({ hud, snapshot, danger, signal, canEngage, mouseLook }: Hud
         {`NIVEAU ${hud.level}`}
       </div>
       <div className="hud__corner hud__bl">
-        {log ? <span className={log.danger ? 'hud__danger' : ''}>{log.text}</span> : hint && <span className={canEngage ? '' : 'dim'}>{hint}</span>}
+        {log ? <span className={log.danger ? 'hud__danger' : ''}>{log.text}</span> : hint && <span className={canEngage || canRead ? '' : 'dim'}>{hint}</span>}
       </div>
       {exploring && <div className={`hud__crosshair${canEngage ? ' hud__crosshair--active' : ''}`} />}
     </div>

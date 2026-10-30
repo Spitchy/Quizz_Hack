@@ -1,7 +1,7 @@
 import { useFrame } from '@react-three/fiber'
 import { useRef } from 'react'
 import { Vector3, type Group, type Mesh } from 'three'
-import { lerp, smoothNoise, type ArchetypeProps } from './anim'
+import { holdGrip, lerp, poseHeld, smoothNoise, type ArchetypeProps } from './anim'
 import { Arm, Ball, Limb } from './parts'
 import { createArmRig, poseArm } from './rig'
 
@@ -20,6 +20,7 @@ const LEAP_UP = 0.55
 
 const target = new Vector3()
 const pole = new Vector3()
+const pose = new Vector3()
 
 export function RaincoatChild({ look, motion, mats, sign }: ArchetypeProps) {
   const body = useRef<Group>(null)
@@ -62,17 +63,16 @@ export function RaincoatChild({ look, motion, mats, sign }: ArchetypeProps) {
     // Panneau brandi au-dessus de la tête, secoué à la colère ; les mains le tiennent.
     h.position.set(SIGN_AT.x, SIGN_AT.y + Math.sin(t * 18) * 0.04 * anger, SIGN_AT.z)
     h.rotation.set(Math.sin(t * 18) * 0.1 * anger, 0, smoothNoise(t * 6, 4) * 0.2 * anger)
+    poseHeld(h, m)
     h.updateMatrix()
     for (const [rig, grip, side] of [
       [armL.current, GRIP_L, -1],
       [armR.current, GRIP_R, 1],
     ] as const) {
-      if (sign) {
-        target.copy(grip).applyMatrix4(h.matrix)
-      } else {
-        // Sans panneau : bras levés, doigts en griffes ; tendus vers le visage au bond.
-        target.set(side * lerp(0.38, 0.16, leap), lerp(1.35 + Math.sin(t * 3 + side) * 0.05, 1.15, leap), lerp(0.2, 0.55, leap))
-      }
+      // Sans panneau : bras levés, doigts en griffes ; tendus vers le visage au bond.
+      pose.set(side * lerp(0.38, 0.16, leap), lerp(1.35 + Math.sin(t * 3 + side) * 0.05, 1.15, leap), lerp(0.2, 0.55, leap))
+      if (sign) holdGrip(target, grip, h, m, pose)
+      else target.copy(pose)
       pole.set(side * 0.8, 0.8, -0.3)
       poseArm(rig, target, pole)
     }

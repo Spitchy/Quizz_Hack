@@ -5,6 +5,7 @@ import { directionFromTurn, readMazeLayout, readShowAnswers } from './config'
 import { corrupt, infectionBar, pad } from './hudText'
 import {
   BEAT_SECONDS,
+  arrivalAt,
   beatSchedule,
   CCTV_STAGES,
   collapseAt,
@@ -141,17 +142,31 @@ describe('séquences de fin', () => {
     }
   })
 
-  it('passage à tabac : chacun son tour, de plus en plus vite, puis il gît avant le noir', () => {
+  it('passage à tabac : chacune frappe dès son arrivée, et sans attendre', () => {
     expect(beatSchedule(0)).toEqual([])
-    const hits = beatSchedule(3, BEAT_SECONDS)
-    expect(hits.map((h) => h.attacker)).toEqual([0, 1, 2, 0, 1, 2, 0, 1])
-    expect(hits[0].at).toBeGreaterThan(0)
-    // Plus d'une seconde sans coup à la fin : on le voit à terre, dans son sang.
-    expect(hits.at(-1)!.at).toBeLessThan(BEAT_SECONDS - 1)
-    const gaps = hits.slice(1).map((h, i) => h.at - hits[i].at)
-    expect(gaps.at(-1)!).toBeLessThan(gaps[0])
+    for (const attackers of [1, 2, 3, 6, 10]) {
+      const hits = beatSchedule(attackers, BEAT_SECONDS)
+      // Triés dans le temps : le corps les encaisse dans l'ordre.
+      hits.slice(1).forEach((h, i) => expect(h.at).toBeGreaterThanOrEqual(hits[i].at))
+      for (let a = 0; a < attackers; a++) {
+        const own = hits.filter((h) => h.attacker === a).map((h) => h.at)
+        expect(own.length).toBeGreaterThanOrEqual(2)
+        // Son premier coup tombe à son arrivée.
+        expect(own[0] - arrivalAt(a)).toBeLessThan(0.15)
+        // Elle n'attend jamais : pas de pause entre deux coups.
+        own.slice(1).forEach((at, i) => expect(at - own[i]).toBeLessThanOrEqual(Math.max(0.72, attackers * 0.24) * 1.15))
+      }
+      // Ça tape jusqu'au noir.
+      expect(BEAT_SECONDS - hits.at(-1)!.at).toBeLessThan(1.6)
+      expect(hits.length).toBeLessThanOrEqual(40)
+    }
     expect(beatSchedule(1).length).toBeGreaterThanOrEqual(5)
-    expect(beatSchedule(10).length).toBeLessThanOrEqual(12)
+  })
+
+  it('la première arrive au début du passage à tabac, les autres la rejoignent vite', () => {
+    expect(arrivalAt(0)).toBe(0)
+    expect(arrivalAt(1)).toBeGreaterThan(0)
+    expect(arrivalAt(50)).toBeLessThan(BEAT_SECONDS / 2)
   })
 
   it('effondrement : debout, à genoux, puis à terre au fil des coups', () => {

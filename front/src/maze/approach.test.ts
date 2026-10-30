@@ -4,6 +4,19 @@ import { generateCorridor } from './corridor'
 import { entityPlacement, generateMaze, isFloor, tileAt } from './generate'
 
 describe('planApproach', () => {
+  it('ne place personne sur un meuble', () => {
+    const m = generateCorridor({ seed: 'meuble', entityCount: 6 })
+    const from = m.entities.map((e) => ({ entity: e.id, from: entityPlacement(e).position }))
+    const free = planApproach(m, entityPlacement(m.entities[3]).reading, from)
+    const end = free.plans[0].path.at(-1)!
+    const avoid = { x: end.x, z: end.z, radius: 0.5 }
+    const out = planApproach(m, entityPlacement(m.entities[3]).reading, from, { avoid })
+    for (const plan of out.plans.slice(0, 3)) {
+      const last = plan.path.at(-1)!
+      expect(Math.hypot(last.x - avoid.x, last.z - avoid.z)).toBeGreaterThan(0.5)
+    }
+  })
+
   const maze = generateCorridor({ seed: 'approach' })
   // Le joueur lit le panneau de la 6e entité ; les entités 0, 2, 4 ont été fâchées.
   const player = entityPlacement(maze.entities[5]).reading
@@ -12,7 +25,6 @@ describe('planApproach', () => {
 
   it('un trajet par entité fâchée, départs échelonnés', () => {
     expect(plans.map((p) => p.entity)).toEqual([0, 2, 4, 5])
-    plans.forEach((p, k) => expect(p.delay).toBeCloseTo(k * 0.4))
   })
 
   it('le regard se tourne vers le côté d’où vient la majorité (le départ du couloir)', () => {

@@ -19,6 +19,8 @@ const LEGS: { x: number; z: number; side: number; front: boolean }[] = [
 ]
 /** Élan maximal vers l'avant (m) : elle frappe sans traverser sa cible. */
 const LUNGE = 0.32
+/** Position (z) des pieds arrière : le pivot quand elle se cabre. */
+const HIND_FEET = -0.59
 
 export function Crawler({ look, motion, mats, sign }: ArchetypeProps) {
   const body = useRef<Group>(null)
@@ -32,15 +34,20 @@ export function Crawler({ look, motion, mats, sign }: ArchetypeProps) {
     const anger = m.anger
 
     // Respiration du torse, trot latéral nerveux quand elle est fâchée.
-    const rear = Math.max(m.fresh * 0.85, anger * 0.25)
+    const rear = Math.max(m.fresh * 0.55, anger * 0.2)
     const pounce = Math.max(0, m.attack)
     const crouch = Math.max(0, -m.attack)
+    // Elle se cabre en pivotant sur ses pieds arrière, qui restent au sol, et en
+    // avançant : le dos et le pieu ne partent pas dans le mur.
+    const pitch = -rear - pounce * 0.35 + crouch * 0.12
+    const lift = HIND_FEET * Math.sin(pitch)
+    const shift = HIND_FEET * (1 - Math.cos(pitch))
     body.current.position.set(
-      (Math.sin(t * 9) * 0.7 + smoothNoise(t * 5, 2) * 0.6) * 0.18 * anger * (1 - pounce),
-      Math.sin(t * 1.6) * 0.015 + Math.abs(Math.sin(m.walkPhase * 2)) * 0.04 * m.walk + pounce * 0.3 - crouch * 0.12,
-      pounce * LUNGE - crouch * 0.12,
+      (Math.sin(t * 9) * 0.7 + smoothNoise(t * 5, 2) * 0.6) * 0.1 * anger * (1 - pounce),
+      Math.sin(t * 1.6) * 0.015 + Math.abs(Math.sin(m.walkPhase * 2)) * 0.04 * m.walk + pounce * 0.18 - crouch * 0.08 + lift,
+      pounce * LUNGE - crouch * 0.12 + shift + rear * 0.35,
     )
-    body.current.rotation.set(-rear - pounce * 0.35 + crouch * 0.12, 0, Math.sin(t * 0.9) * 0.03)
+    body.current.rotation.set(pitch, 0, Math.sin(t * 0.9) * 0.03)
 
     // Tête : à l'envers au repos, se redresse quand elle se cabre ou bondit.
     const upright = clamp01(rear + pounce)
@@ -75,12 +82,12 @@ export function Crawler({ look, motion, mats, sign }: ArchetypeProps) {
 
       {/* Pattes pliées vers le haut puis vers le sol, comme une araignée : un seul trait continu. */}
       {LEGS.map((leg, i) => {
-        const knee: [number, number, number] = [leg.side * 0.42, 0.32, leg.front ? 0.18 : -0.18]
+        const knee: [number, number, number] = [leg.side * 0.3, 0.32, leg.front ? 0.18 : -0.14]
         return (
           <group key={i} ref={(g) => { legs.current[i] = g }} position={[leg.x, 0.78, leg.z]}>
             <Limb from={[0, 0, 0]} to={knee} radius={0.042} material={mats.body} taper={0.95} />
             <Ball position={knee} radius={0.047} material={mats.secondary} />
-            <Limb from={knee} to={[leg.side * 0.62, -0.76, leg.front ? 0.38 : -0.3]} radius={0.038} material={mats.body} taper={0.35} />
+            <Limb from={knee} to={[leg.side * 0.42, -0.76, leg.front ? 0.38 : -0.24]} radius={0.038} material={mats.body} taper={0.35} />
           </group>
         )
       })}

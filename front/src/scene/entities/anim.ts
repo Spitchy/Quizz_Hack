@@ -1,14 +1,16 @@
 import { CanvasTexture, SRGBColorSpace, type Material, type MeshBasicMaterial } from 'three'
 import type { ReactNode, RefObject } from 'react'
+import type { Object3D, Vector3 } from 'three'
 import { PALETTE } from '../layout'
 import type { EntityLook } from './archetypes'
+import { restGesture, type SignGesture } from './signBreak'
 
 // État d'animation partagé entre `Entity` et les archétypes, et outils purs.
 
 export type Mood = 'calm' | 'angry' | 'menace'
 
 /** État d'animation écrit par `Entity` à chaque frame, lu par les archétypes. */
-export interface EntityMotion {
+export interface EntityMotion extends SignGesture {
   t: number
   mood: Mood
   /** Secondes depuis le début d'une colère fraîche (mauvaise réponse), sinon `null`. */
@@ -48,6 +50,7 @@ export const initialMotion = (): EntityMotion => ({
   walkPhase: 0,
   attack: 0,
   ghost: false,
+  ...restGesture(),
 })
 
 export interface EntityMaterials {
@@ -130,14 +133,48 @@ export const angerLevel = (m: EntityMotion) => m.anger
  * jusqu'à +1 à l'instant de l'impact, tenue, puis retour au repos.
  */
 export function attackEnvelope(hits: readonly number[], since: number): number {
+  let last = -Infinity
+  let next = Infinity
   for (const at of hits) {
-    const dt = since - at
-    if (dt > -0.55 && dt < -0.09) return -ease((dt + 0.55) / 0.46)
-    if (dt >= -0.09 && dt < 0) return lerp(-1, 1, ease((dt + 0.09) / 0.09))
-    if (dt >= 0 && dt < 0.14) return 1
-    if (dt >= 0.14 && dt < 0.65) return 1 - ease((dt - 0.14) / 0.51)
+    if (at <= since) last = at
+    else {
+      next = at
+      break
+    }
   }
+  const after = since - last
+  const before = next - since
+  // La frappe : d'armé à l'impact, très vite.
+  if (before < 0.09) return lerp(-1, 1, ease((0.09 - before) / 0.09))
+  // Tenu un instant à l'impact.
+  if (after < 0.14) return 1
+  const released = last + 0.14
+  const ready = next - 0.09
+  // Coups rapprochés : il repart directement de l'impact vers l'armé suivant.
+  if (ready - released < 1.1) return lerp(1, -1, ease((since - released) / (ready - released)))
+  // Sinon, retour au repos, puis armé.
+  if (after < 0.65) return 1 - ease((after - 0.14) / 0.51)
+  if (before < 0.55) return -ease((0.55 - before) / 0.46)
   return 0
+}
+
+/** Ajoute le geste de rupture à la pose du panneau (avant `updateMatrix`). */
+export function poseHeld(held: Object3D, m: EntityMotion): void {
+  held.position.y += m.signLift
+  held.position.z += m.signPush
+  held.rotation.x += m.signTilt
+}
+
+/** Main sur le panneau, qui le serre ou le déchire, jusqu'à ce qu'elle le lâche et rejoigne `pose`. */
+export function holdGrip(out: Vector3, grip: Vector3, held: Object3D, m: EntityMotion, pose: Vector3): void {
+  if (m.free >= 1) {
+    out.copy(pose)
+    return
+  }
+  out.copy(grip)
+  out.x *= 1 - m.squeeze
+  out.applyMatrix4(held.matrix)
+  if (m.free > 0) out.lerp(pose, m.free)
 }
 
 /** Dents : croissant pâle et interstices, partagé par tous les monstres. */
