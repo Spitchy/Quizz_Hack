@@ -37,6 +37,97 @@ export function stepHard(rate: number, random: Random, variant: number): Samples
   return normalize(fadeEdges(out, rate, 0.0005, 0.02))
 }
 
+// --- Intro : le bulletin, la rue, la camionnette --------------------------------
+
+/** Générique du flash : trois accords de cuivres métalliques, dans un petit poste. */
+export function newsSting(rate: number): Samples {
+  const seconds = 1.5
+  const out = alloc(seconds, rate)
+  const stabs = [
+    { at: 0, notes: [196, 293.66, 392, 466.16], tau: 0.16 },
+    { at: 0.22, notes: [196, 293.66, 392, 466.16], tau: 0.12 },
+    { at: 0.44, notes: [233.08, 349.23, 466.16, 554.37], tau: 0.45 },
+  ]
+  const tone = new Biquad('bandpass', 1300, 0.7, rate)
+  for (let i = 0; i < out.length; i++) {
+    const t = i / rate
+    let v = 0
+    for (const { at, notes, tau } of stabs) {
+      if (t < at) continue
+      const local = t - at
+      for (const f of notes) v += (((f * local) % 1) * 2 - 1) * hitEnv(local, 0.008, tau)
+    }
+    out[i] = softClip(tone.tick(v * 0.5), 1.4)
+  }
+  return normalize(fadeEdges(out, rate, 0.002, 0.1), 0.8)
+}
+
+/** Le bulletin ne se charge pas : un parasite de poste, très bref. */
+export function newsStatic(rate: number, random: Random): Samples {
+  const out = alloc(1, rate)
+  const band = new Biquad('bandpass', 1900, 0.8, rate)
+  for (let i = 0; i < out.length; i++) out[i] = band.tick(random() * 2 - 1) * bell(i / out.length)
+  return normalize(out, 0.5)
+}
+
+/** Verrouillage du téléphone : deux clics minuscules. */
+export function phoneLock(rate: number, random: Random): Samples {
+  const out = alloc(0.14, rate)
+  const click = new Biquad('bandpass', 3400, 2, rate)
+  for (let i = 0; i < out.length; i++) {
+    const t = i / rate
+    const second = t - 0.06
+    out[i] = click.tick(random() * 2 - 1) * (decay(t, 0.0035) + (second > 0 ? decay(second, 0.003) * 0.6 : 0))
+  }
+  return normalize(out, 0.8)
+}
+
+/** Pneus qui mordent sur le bitume mouillé : un sifflement qui retombe, de l'eau projetée. */
+export function tireScreech(rate: number, random: Random): Samples {
+  const seconds = 1.7
+  const out = alloc(seconds, rate)
+  const squeal = new Biquad('bandpass', 1500, 9, rate)
+  const spray = new Biquad('highpass', 1800, 0.7, rate)
+  for (let i = 0; i < out.length; i++) {
+    const t = i / rate
+    if (i % 32 === 0) squeal.set(1750 - 620 * (t / seconds) + Math.sin(t * 47) * 40, 9)
+    const white = random() * 2 - 1
+    out[i] = squeal.tick(white) * bell(t / seconds) ** 0.6 * 2.4 + spray.tick(white) * bell(t / seconds) * 0.28
+  }
+  return normalize(fadeEdges(out, rate, 0.02, 0.2), 0.85)
+}
+
+/** Porte coulissante : le rail qui roule, puis la butée. */
+export function vanDoor(rate: number, random: Random): Samples {
+  const seconds = 1.25
+  const out = alloc(seconds, rate)
+  const rail = new Biquad('bandpass', 620, 1.4, rate)
+  const stop = new Resonator(96, 16, rate)
+  const clang = new Resonator(780, 60, rate)
+  const hitAt = 0.82
+  for (let i = 0; i < out.length; i++) {
+    const t = i / rate
+    const rolling = t < hitAt ? Math.min(1, t * 6) * (0.65 + 0.35 * Math.sin(t * 70)) : 0
+    const after = t - hitAt
+    const kick = after >= 0 && after < 0.002 ? 6 : 0
+    out[i] = rail.tick(random() * 2 - 1) * rolling * 1.5 + stop.tick(kick) * 1.5 + clang.tick(kick) * 0.5
+  }
+  return normalize(fadeEdges(out, rate, 0.01, 0.1), 0.9)
+}
+
+/** Une masse fend l'air : batte ou jambe, le souffle monte puis s'éteint. */
+export function batSwing(rate: number, random: Random): Samples {
+  const seconds = 0.34
+  const out = alloc(seconds, rate)
+  const band = new Biquad('bandpass', 500, 1.1, rate)
+  for (let i = 0; i < out.length; i++) {
+    const t = i / rate
+    if (i % 16 === 0) band.set(420 + 2100 * (t / seconds) ** 2, 1.1)
+    out[i] = band.tick(random() * 2 - 1) * (t / seconds) ** 2 * bell(t / seconds + 0.08)
+  }
+  return normalize(fadeEdges(out, rate, 0.004, 0.01), 0.85)
+}
+
 // --- Verdict d'une réponse -----------------------------------------------------
 
 /** Mauvaise réponse : le choc. Grappe dissonante, chute dans le grave, éclats du panneau. */

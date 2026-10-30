@@ -48,6 +48,30 @@ export function clearSessionId(store: KeyValueStore | null): void {
   }
 }
 
+const INTRO_KEY = 'quizzhack.introSeen'
+
+/** L'intro passe une fois par onglet, à la première vraie entrée. */
+export function introSeen(store: KeyValueStore | null): boolean {
+  try {
+    return store?.getItem(INTRO_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+export function markIntroSeen(store: KeyValueStore | null): void {
+  try {
+    store?.setItem(INTRO_KEY, '1')
+  } catch {
+    // idem
+  }
+}
+
+/** Faut-il montrer l'intro ? Pas si une session est à reprendre, ni si elle a déjà été vue. */
+export function wantsIntro(store: KeyValueStore | null): boolean {
+  return !loadSessionId(store) && !introSeen(store)
+}
+
 export interface Launch {
   token: string | null
   /** URL sans le jeton, à remettre dans la barre d'adresse (`null` si inchangée). */

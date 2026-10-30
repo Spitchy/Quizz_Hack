@@ -87,10 +87,18 @@ Voix de synthèse, sans aucun enregistrement de voix fait pour le jeu. Généré
 | `anger-cluster-1.wav` | Tu es à nous. | CC BY-NC-SA 4.0 |
 | `anger-cluster-2.wav` | Reste avec nous. | CC BY-NC-SA 4.0 |
 
+## Bulletin de l'intro
+
+Même voix de synthèse, même réserve de licence. Fichier généré pour le jeu, filtré comme un petit poste de télévision.
+
+| Fichier | Texte | Licence |
+| --- | --- | --- |
+| `news-broadcast-1.wav` | Dernière heure. Neuf développeurs disparus cette semaine. La police recherche le docteur. Il kidnappe des développeurs, et il les teste sur les bases du code. Ceux qui échouent, il leur inocule le virus. D'après ce docteur, l'I.A. a tué le savoir des développeurs. Si vous codez, restez chez vous ce soir. Et révisez. | CC BY-NC-SA 4.0 |
+
 ## Bande-son
 
 `japanese-sandman-1920.mp3` : *The Japanese Sandman*, Paul Whiteman and His Ambassador Orchestra, enregistré le 23 août 1920 (Victor). Fichier d'origine tel quel, depuis [Wikimedia Commons](https://commons.wikimedia.org/wiki/File:%22The_Japanese_Sandman%22,_by_Paul_Whiteman,_Acoustic_1920_78_rpm.mp3), marqué domaine public. Enregistrement dans le domaine public aux États-Unis (publié avant 1926). Musique de Richard A. Whiting (mort en 1938), paroles de Raymond B. Egan (mort en 1952). Le ralenti, le filtre de vieux poste, les craquements et le souffle sont ajoutés par le jeu pendant la lecture.
 
 ## Générés en code
 
-Tout le reste est calculé par le jeu (`src/audio/recipes/`), sans fichier ni licence tierce : ambiance de la pièce, néons, drone, cœur, parasites, souffle de bande, souffle et craquements du disque, froissement du journal, acouphène, goutte de perfusion, présences des monstres, aiguille, piston, rire du médecin, glitchs, vent et herbe. L'air que fredonne l'enfant est *Au clair de la lune*, du domaine public.
+Tout le reste est calculé par le jeu (`src/audio/recipes/`), sans fichier ni licence tierce : ambiance de la pièce, néons, drone, cœur, parasites, souffle de bande, souffle et craquements du disque, froissement du journal, acouphène, goutte de perfusion, présences des monstres, aiguille, piston, rire du médecin, glitchs, vent et herbe, pluie, moteur de la camionnette, pneus, porte coulissante, générique du flash, batte qui fend l'air. L'air que fredonne l'enfant est *Au clair de la lune*, du domaine public.

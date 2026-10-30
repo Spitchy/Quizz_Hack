@@ -1,8 +1,48 @@
 import type { Random } from '../../maze/random'
-import { alloc, bell, Biquad, brownNoise, decay, drift, loopable, normalize, pinkNoise, softClip, TAU, type Samples } from '../dsp'
+import { addAt, alloc, bell, Biquad, brownNoise, decay, drift, loopable, normalize, pinkNoise, softClip, TAU, type Samples } from '../dsp'
 
 // Couches continues : tout est une boucle sans raccord, calculée une fois.
 // Les harmoniques tombent juste sur la durée de la boucle (cycles entiers).
+
+/** Pluie sur le bitume : un rideau de bruit, et des gouttes plus lourdes par-dessus. */
+export function rain(rate: number, random: Random): Samples {
+  const seconds = 6
+  const overlap = 0.8
+  const out = alloc(seconds + overlap, rate)
+  const pink = pinkNoise(random)
+  const high = new Biquad('highpass', 700, 0.6, rate)
+  const top = new Biquad('lowpass', 8200, 0.6, rate)
+  const body = new Biquad('bandpass', 420, 0.6, rate)
+  const swell = drift(random, seconds + overlap, 1.7)
+  for (let i = 0; i < out.length; i++) {
+    const white = random() * 2 - 1
+    out[i] = top.tick(high.tick(white)) * 0.55 * (0.86 + swell(i / rate) * 0.14) + body.tick(pink()) * 0.5
+  }
+  for (let d = 0; d < 170; d++) {
+    const drop = alloc(0.018, rate)
+    const pitch = 1200 + random() * 3400
+    for (let i = 0; i < drop.length; i++) drop[i] = Math.sin((TAU * pitch * i) / rate) * decay(i / rate, 0.004)
+    addAt(out, drop, random() * (seconds + overlap - 0.02), rate, 0.1 + random() * 0.22)
+  }
+  return normalize(loopable(out, overlap, rate), 0.75)
+}
+
+/** Diesel au ralenti : un claquement par cylindre, sur une durée entière de cycles. */
+export function vanIdle(rate: number, random: Random): Samples {
+  const seconds = 2
+  const overlap = 0.25
+  const out = alloc(seconds + overlap, rate)
+  const low = new Biquad('lowpass', 420, 0.9, rate)
+  const firing = 26
+  for (let i = 0; i < out.length; i++) {
+    const t = i / rate
+    const beat = (t * firing) % 1
+    const knock = decay(beat, 0.14) * (0.8 + 0.2 * Math.sin(TAU * (firing / 4) * t))
+    const tone = Math.sin(TAU * firing * t) * 0.5 + Math.sin(TAU * firing * 2 * t) * 0.3 + Math.sin(TAU * firing * 3 * t) * 0.14
+    out[i] = softClip(low.tick((random() * 2 - 1) * knock * 1.5) * 1.6 + tone * (0.6 + knock * 0.4), 1.5)
+  }
+  return normalize(loopable(out, overlap, rate), 0.8)
+}
 
 /** La pièce : grondement grave, secteur 50 Hz, un peu d'air. */
 export function roomTone(rate: number, random: Random): Samples {

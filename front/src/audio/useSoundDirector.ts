@@ -1,11 +1,24 @@
 import { useEffect, useRef } from 'react'
-import type { DefeatStage, VictoryStage } from '../app/sequence'
+import type { DefeatStage, IntroStage, VictoryStage } from '../app/sequence'
 import { dangerLevel } from '../game/render'
 import type { GameSnapshot } from '../game/types'
-import { CUES } from './cues'
-import { duck, enterMoment, playSound, setDanger } from './engine'
-import { momentFor } from './mix'
+import { CUES, type Cue } from './cues'
+import { duck, enterMoment, playOnTv, playSound, setDanger } from './engine'
+import { introMoment, momentFor, type Moment } from './mix'
 import { playAt, playEntityAnger, playEntityRelease } from './stage'
+
+function playCues(moment: Moment): void {
+  for (const cue of CUES[moment] ?? []) playCue(cue)
+}
+
+function playCue(cue: Cue): void {
+  const options = { delay: cue.at, gain: cue.gain, rate: cue.rate }
+  if (cue.tv) playOnTv(cue.sound, options)
+  else if (cue.where) playAt(cue.sound, cue.where, options)
+  else playSound(cue.sound, options)
+  const kind = cue.duck
+  if (kind) window.setTimeout(() => duck(kind), cue.at * 1000)
+}
 
 /**
  * Le chef d'orchestre : traduit l'état du jeu (déjà dérivé du serveur) en
@@ -21,12 +34,7 @@ export function useSoundDirector(snapshot: GameSnapshot, defeat: DefeatStage | n
 
   useEffect(() => {
     enterMoment(moment)
-    for (const cue of CUES[moment] ?? []) {
-      const options = { delay: cue.at, gain: cue.gain, rate: cue.rate }
-      if (cue.where) playAt(cue.sound, cue.where, options)
-      else playSound(cue.sound, options)
-      if (cue.duck) setTimeoutDuck(cue.duck, cue.at)
-    }
+    playCues(moment)
   }, [moment])
 
   // Le silence revient si la vue de jeu disparaît (écran d'erreur).
@@ -53,6 +61,21 @@ export function useSoundDirector(snapshot: GameSnapshot, defeat: DefeatStage | n
   }, [lastAnswer, engagedEntity])
 }
 
-function setTimeoutDuck(kind: 'laugh', delay: number) {
-  window.setTimeout(() => duck(kind), delay * 1000)
+/** Le son de l'intro, avant la vue de jeu. Tout s'arrête net si elle est passée. */
+export function useIntroSound(stage: IntroStage | null): void {
+  // Une étape ne joue ses sons qu'une fois, même si l'effet est rejoué (mode strict de React).
+  const played = useRef<IntroStage | null>(null)
+  useEffect(() => {
+    if (!stage || stage === 'done') return
+    const moment = introMoment(stage)
+    enterMoment(moment)
+    if (played.current === stage) return
+    played.current = stage
+    playCues(moment)
+  }, [stage])
+  const running = stage !== null && stage !== 'done'
+  useEffect(() => {
+    if (!running) return
+    return () => enterMoment('silent')
+  }, [running])
 }

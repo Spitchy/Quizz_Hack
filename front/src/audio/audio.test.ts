@@ -1,6 +1,6 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { beatSchedule, DEFEAT_TIMELINE, DOOR_TIMELINE, VICTORY_TIMELINE } from '../app/sequence'
+import { beatSchedule, DEFEAT_TIMELINE, DOOR_TIMELINE, INTRO_TIMELINE, VICTORY_TIMELINE } from '../app/sequence'
 import type { Phase } from '../game/types'
 import { generateCorridor } from '../maze/corridor'
 import { isFloor, TILE_SIZE } from '../maze/generate'
@@ -18,6 +18,7 @@ import {
   heartbeatGain,
   heartbeatInterval,
   LAYER_TRIM,
+  introMoment,
   LAYERS,
   MIXES,
   momentFor,
@@ -87,6 +88,21 @@ describe('moments', () => {
       for (const layer of Object.keys(mix.levels)) expect(LAYERS).toContain(layer)
       for (const step of mix.timeline ?? []) expect([...LAYERS, 'muffle']).toContain(step.target)
     }
+  })
+})
+
+describe('intro et scène du dossier', () => {
+  it('a une balance et un moment pour chaque étape', () => {
+    for (const [stage] of INTRO_TIMELINE) expect(MIXES[introMoment(stage)], stage).toBeDefined()
+    expect(introMoment('done')).toBe('silent')
+  })
+
+  it('fait entendre la pluie et le moteur seulement dehors', () => {
+    const outside = (Object.keys(MIXES) as Moment[]).filter((m) => (MIXES[m].levels.rain ?? 0) > 0)
+    for (const m of outside) expect(m.startsWith('intro'), m).toBe(true)
+    expect(MIXES.introNews.levels.tv).toBeGreaterThan(0)
+    expect(MIXES.introPocket.levels.tv ?? 0).toBe(0)
+    expect(MIXES.introPocket.levels.tvSmall ?? 0).toBe(0)
   })
 })
 

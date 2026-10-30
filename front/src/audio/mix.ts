@@ -1,4 +1,4 @@
-import type { DefeatStage, VictoryStage } from '../app/sequence'
+import type { DefeatStage, IntroStage, VictoryStage } from '../app/sequence'
 import type { Phase } from '../game/types'
 
 // Mixage, en fonctions pures : quel « moment » du jeu on vit, quel niveau pour
@@ -27,6 +27,34 @@ export type Moment =
   | 'door'
   | 'through'
   | 'outside'
+  // L'intro, une balance par étape.
+  | 'introNews'
+  | 'introPull'
+  | 'introWatch'
+  | 'introPocket'
+  | 'introLook'
+  | 'introVan'
+  | 'introDoor'
+  | 'introRun'
+  | 'introSwing'
+  | 'introBlack'
+
+const INTRO_MOMENTS: Record<Exclude<IntroStage, 'done'>, Moment> = {
+  news: 'introNews',
+  pull: 'introPull',
+  watch: 'introWatch',
+  pocket: 'introPocket',
+  look: 'introLook',
+  van: 'introVan',
+  door: 'introDoor',
+  run: 'introRun',
+  swing: 'introSwing',
+  black: 'introBlack',
+}
+
+export function introMoment(stage: IntroStage): Moment {
+  return stage === 'done' ? 'silent' : INTRO_MOMENTS[stage]
+}
 
 export function momentFor(phase: Phase, defeat: DefeatStage | null, victory: VictoryStage | null): Moment {
   if (defeat) return defeat
@@ -70,8 +98,20 @@ export type Layer =
   | 'crush'
   /** Profondeur des coupures numériques. */
   | 'gate'
+  /** La pluie de la rue, dans l'intro. */
+  | 'rain'
+  /** La camionnette au ralenti. */
+  | 'van'
+  /** Le bulletin plein écran, dans la tête. */
+  | 'tv'
+  /** Le même bulletin, sorti du haut-parleur minuscule du téléphone. */
+  | 'tvSmall'
 
 export const LAYERS: readonly Layer[] = [
+  'rain',
+  'van',
+  'tv',
+  'tvSmall',
   'roomTone',
   'neon',
   'drone',
@@ -112,6 +152,10 @@ export const LAYER_TRIM: Record<Layer, number> = {
   cctv: 1,
   crush: 1,
   gate: 1,
+  rain: 0.42,
+  van: 0.55,
+  tv: 0.85,
+  tvSmall: 1.15,
 }
 
 /** Une consigne différée à l'intérieur d'un moment. */
@@ -230,6 +274,48 @@ export const MIXES: Record<Moment, MomentMix> = {
   door: { levels: { wind: 0.25 }, fade: 0.6, room: 'tiles' },
   through: { levels: { wind: 0.6, grass: 0.3 }, fade: 0.6 },
   outside: { levels: { wind: 0.85, grass: 0.9 }, fade: 1.2 },
+
+  // --- Intro ---
+  // Plein écran : le bulletin occupe tout, la pluie est à peine là.
+  introNews: { levels: { tv: 1, rain: 0.05 }, fade: 0.05 },
+  // Le recul : le son rentre dans le haut-parleur, la rue s'ouvre autour.
+  introPull: {
+    levels: { tv: 1, rain: 0.05 },
+    fade: 0.05,
+    timeline: [
+      { at: 0.2, target: 'tv', to: 0, fade: 1 },
+      { at: 0.2, target: 'tvSmall', to: 1, fade: 0.9 },
+      { at: 0.2, target: 'rain', to: 0.85, fade: 1.2 },
+    ],
+  },
+  introWatch: { levels: { tvSmall: 1, rain: 0.9 }, fade: 0.1 },
+  // Écran verrouillé : la voix s'arrête net, il ne reste que la pluie.
+  introPocket: { levels: { rain: 1 }, fade: 0.03 },
+  introLook: { levels: { rain: 1, breath: 0.3 }, fade: 0.4 },
+  introVan: {
+    levels: { rain: 1, breath: 0.45 },
+    fade: 0.3,
+    timeline: [{ at: 0.2, target: 'van', to: 1, fade: 1.3 }],
+  },
+  introDoor: { levels: { rain: 0.85, van: 1, breath: 0.9, heartbeat: 1 }, fade: 0.2 },
+  // Il court : la camionnette reste derrière lui.
+  introRun: {
+    levels: { rain: 0.8, van: 0.6, breath: 1.3, heartbeat: 1 },
+    fade: 0.3,
+    timeline: [{ at: 0.4, target: 'van', to: 0.22, fade: 1.1 }],
+  },
+  introSwing: { levels: { rain: 0.45, van: 0.12, breath: 0.4, heartbeat: 1 }, fade: 0.08 },
+  // Le coup : plus rien que le sifflement ; la porte qui claque, de très loin.
+  introBlack: {
+    levels: { tinnitus: 1, rain: 0.2, van: 0.22 },
+    fade: 0.01,
+    muffle: 340,
+    timeline: [
+      { at: 1.1, target: 'van', to: 0, fade: 0.5 },
+      { at: 1.5, target: 'rain', to: 0, fade: 0.4 },
+      { at: 1.6, target: 'tinnitus', to: 0, fade: 0.6 },
+    ],
+  },
 }
 
 /** Vitesse du disque : il traîne toujours un peu, ce qui baisse aussi sa hauteur. */

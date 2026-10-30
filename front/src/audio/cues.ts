@@ -17,6 +17,8 @@ export interface Cue {
   /** Position dans le monde ; sans elle, le son est « dans la tête ». */
   where?: CuePoint
   duck?: 'laugh'
+  /** Passe par le bulletin (plein écran, puis haut-parleur du téléphone). */
+  tv?: boolean
 }
 
 const DOOR_POINT: CuePoint = [DOOR.hingeX + DOOR.width / 2, 1.2, DOOR.z]
@@ -62,6 +64,40 @@ export const CUES: Partial<Record<Moment, readonly Cue[]>> = {
   ],
   release: [{ at: 0, sound: 'surge', gain: 0.8 }],
   door: [{ at: 0, sound: 'door-white', gain: 0.9 }],
+
+  // --- Intro : mêmes dates que `introMotion`. ---
+  introNews: [
+    { at: 0, sound: 'news-sting', gain: 0.5 },
+    { at: 0, sound: 'news-broadcast', tv: true },
+  ],
+  introPocket: [
+    { at: 0, sound: 'phone-lock', gain: 0.8 },
+    { at: 0.55, sound: 'leather', gain: 0.35 },
+    { at: 1.05, sound: 'leather', gain: 0.25, rate: 0.85 },
+  ],
+  introVan: [{ at: 2.45, sound: 'tire-screech', gain: 0.5 }],
+  introDoor: [
+    { at: 0.3, sound: 'van-door', gain: 0.85 },
+    { at: 0.5, sound: 'gasp', gain: 0.6 },
+    { at: 1.25, sound: 'step-hard', gain: 0.5, rate: 0.85 },
+    { at: 1.55, sound: 'step-hard', gain: 0.55, rate: 0.8 },
+  ],
+  introRun: [0.05, 0.36, 0.68, 0.98, 1.3, 1.6, 1.92, 2.22, 2.54, 2.84].map((at, i) => ({
+    at,
+    sound: 'step-hard' as const,
+    gain: 0.62,
+    rate: i % 2 ? 0.86 : 0.92,
+  })),
+  introSwing: [
+    { at: 0, sound: 'gasp', gain: 0.8 },
+    { at: 0.22, sound: 'bat-swing', gain: 1 },
+  ],
+  introBlack: [
+    { at: 0, sound: 'hit-bone', gain: 1 },
+    { at: 0, sound: 'hit-flesh', gain: 1, rate: 0.75 },
+    { at: 0.62, sound: 'body-fall', gain: 0.55 },
+    { at: 1.65, sound: 'van-door', gain: 0.28, rate: 1.25 },
+  ],
 }
 
 /** Durée de chaque étape de la mise en scène : aucun son ne doit la déborder par erreur. */

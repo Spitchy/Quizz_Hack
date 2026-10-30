@@ -87,5 +87,17 @@ export function whenRecorded(name: SoundName, callback: (buffer: AudioBuffer) =>
   recordingListeners.set(name, [...(recordingListeners.get(name) ?? []), callback])
 }
 
+/** Se résout quand l'enregistrement est décodé, ou après `ms` : on n'attend jamais longtemps. */
+export function recordingReady(name: SoundName, ms: number): Promise<void> {
+  if (sampled.has(name)) return Promise.resolve()
+  return new Promise((resolve) => {
+    const timer = window.setTimeout(resolve, ms)
+    whenRecorded(name, () => {
+      window.clearTimeout(timer)
+      resolve()
+    })
+  })
+}
+
 /** État de la banque, pour les outils de test. */
 export const bankStatus = () => ({ ready: buffers.size, recordings: [...sampled] })

@@ -535,6 +535,21 @@
   pointer-events: none;
 }
 
+/* Intro : sorti du noir, le jeu commence ; ce voile cache aussi le montage de la scène. */
+.intro-wake {
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  background: #000;
+  pointer-events: none;
+  animation: intro-wake 2.8s ease-in forwards;
+}
+
+@keyframes intro-wake {
+  0%, 30% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
 /* --- Victoire -------------------------------------------------------------- */
 
 /* La lumière gagne depuis le centre. */

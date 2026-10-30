@@ -67,6 +67,8 @@ interface Graph {
   song: HTMLAudioElement
   /** Sortie de la radio, à brancher sur sa voix dans le monde. */
   radio: GainNode
+  /** Entrée du bulletin de l'intro. */
+  tvInput: GainNode
   /** Sons ponctuels en cours ou programmés : coupés nets au changement de moment. */
   active: Set<AudioBufferSourceNode>
 }
@@ -294,6 +296,23 @@ function buildGraph(ctx: AudioContext): Graph {
   const glitchBed = loopLayer('glitch-bed', buses.ambience)
   const wind = loopLayer('wind', buses.ambience)
   const grass = loopLayer('grass', buses.ambience)
+  const rain = loopLayer('rain', buses.ambience)
+  const van = loopLayer('van-idle', buses.ambience)
+
+  // --- Le bulletin : plein écran, ou sorti du haut-parleur du téléphone. ---
+  const tvDry = gain(0, buses.voices)
+  const tvSmall = gain(0, buses.voices)
+  const speakerLow = ctx.createBiquadFilter()
+  speakerLow.type = 'highpass'
+  speakerLow.frequency.value = 780
+  speakerLow.Q.value = 1.1
+  const speakerHigh = ctx.createBiquadFilter()
+  speakerHigh.type = 'lowpass'
+  speakerHigh.frequency.value = 3900
+  speakerHigh.Q.value = 1.1
+  speakerLow.connect(speakerHigh)
+  speakerHigh.connect(tvSmall)
+  const tvInput = gain(1, tvDry, speakerLow)
 
   // --- Le vieux disque : un pavillon de gramophone, de l'usure, et un plateau qui ondule. ---
   const music = gain(0, buses.ambience)
@@ -386,9 +405,14 @@ function buildGraph(ctx: AudioContext): Graph {
     cctv: cctvWet.gain,
     crush: crushWet.gain,
     gate: gateDepth.gain,
+    rain: rain.gain,
+    van: van.gain,
+    tv: tvDry.gain,
+    tvSmall: tvSmall.gain,
   }
 
   return {
+    tvInput,
     ctx,
     buses,
     ducks,
@@ -636,6 +660,11 @@ function connectSource(g: Graph, name: SoundName, output: AudioNode, { delay = 0
 /** Joue un son sans position (dans la tête, ou sur le mixage). */
 export function playSound(name: SoundName, options: PlayOptions = {}): void {
   if (graph) connectSource(graph, name, graph.buses[options.bus ?? 'effects'], options)
+}
+
+/** Joue un son par le bulletin de l'intro. */
+export function playOnTv(name: SoundName, options: PlayOptions = {}): void {
+  if (graph) connectSource(graph, name, graph.tvInput, options)
 }
 
 /** Joue un son dans une entrée donnée (voix spatiale de la scène). */

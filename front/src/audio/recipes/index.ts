@@ -22,6 +22,16 @@ const recipe = (rate: number, render: Recipe['render'], variants = 1): Recipe =>
 
 /** Dans l'ordre de priorité : ce qui sert en premier est calculé en premier. */
 export const RECIPES = {
+  // L'intro sonne dès le clic.
+  rain: recipe(MID, ambience.rain),
+  'news-sting': recipe(MID, events.newsSting),
+  // Repli si l'enregistrement manque : un parasite plutôt que rien.
+  'news-broadcast': recipe(MID, events.newsStatic),
+  'phone-lock': recipe(HI, events.phoneLock),
+  'van-idle': recipe(LOW, ambience.vanIdle),
+  'tire-screech': recipe(MID, events.tireScreech),
+  'van-door': recipe(MID, events.vanDoor),
+  'bat-swing': recipe(MID, events.batSwing),
   'room-tone': recipe(LOW, ambience.roomTone),
   paper: recipe(MID, events.paper),
   'old-noise': recipe(MID, ambience.oldNoise),

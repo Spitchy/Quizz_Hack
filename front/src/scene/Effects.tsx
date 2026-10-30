@@ -34,9 +34,13 @@ interface EffectsProps {
   bright?: boolean
   /** Défaite : image de caméra de surveillance. */
   cctv?: boolean
+  /** Lissage des arêtes dans la chaîne d'image (0 : aucun, le jeu reste fluide). */
+  msaa?: number
+  /** Moins de grain et de vignette : l'intro se regarde, elle ne se joue pas. */
+  soft?: boolean
 }
 
-export function Effects({ danger, shake, bright = false, cctv = false }: EffectsProps) {
+export function Effects({ danger, shake, bright = false, cctv = false, msaa = 0, soft = false }: EffectsProps) {
   const chroma = useRef<ChromaticAberrationEffect>(null)
   const offset = useMemo(() => new Vector2(0.0006, 0.0006), [])
   const pulse = useRef(0)
@@ -68,12 +72,12 @@ export function Effects({ danger, shake, bright = false, cctv = false }: Effects
   })
 
   return (
-    <EffectComposer multisampling={0}>
+    <EffectComposer multisampling={msaa}>
       <Bloom ref={bloom} luminanceThreshold={bright ? 0.95 : 0.75} luminanceSmoothing={0.2} intensity={bright ? 0.35 : 0.9} mipmapBlur />
       <ChromaticAberration ref={chroma} offset={offset} radialModulation={false} modulationOffset={0} />
       <Scanline density={1.4} opacity={0.07} blendFunction={BlendFunction.OVERLAY} />
-      <Noise opacity={bright ? 0.06 : 0.16} premultiply blendFunction={BlendFunction.SCREEN} />
-      <Vignette offset={0.22} darkness={bright ? 0.25 : 0.9} />
+      <Noise opacity={bright ? 0.06 : soft ? 0.07 : 0.16} premultiply blendFunction={BlendFunction.SCREEN} />
+      <Vignette offset={0.22} darkness={bright ? 0.25 : soft ? 0.72 : 0.9} />
       <Cctv ref={feed} />
     </EffectComposer>
   )

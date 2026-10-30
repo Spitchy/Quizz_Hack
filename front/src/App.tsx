@@ -1,20 +1,23 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react'
 import { createGameApi, readApiConfig } from './api'
-import { preloadSounds } from './audio/bank'
+import { preloadSounds, recordingReady } from './audio/bank'
 import { audioDebug, stopSounds, unlockAudio } from './audio/engine'
 import './app/app.css'
 import { DEV_TOKEN, TIMING } from './app/config'
 import { DefeatOverlay, GameOverOverlay, VictoryOverlay, VictoryScreen } from './app/endings'
 import { SoundControl } from './app/SoundControl'
-import { beatSchedule, DEFEAT_TIMELINE, DOOR_TIMELINE, useTimeline, VICTORY_TIMELINE, type DefeatStage } from './app/sequence'
+import { beatSchedule, DEFEAT_TIMELINE, DOOR_TIMELINE, INTRO_TIMELINE, useTimeline, VICTORY_TIMELINE, type DefeatStage, type IntroStage } from './app/sequence'
 import { ErrorScreen, LoadingScreen, TitleScreen } from './app/screens'
 import {
   browserStore,
   clearSessionId,
   enterGame,
+  introSeen,
+  markIntroSeen,
   NO_TOKEN_ERROR,
   readLaunch,
   saveSessionId,
+  wantsIntro,
 } from './app/session'
 import { createGameController } from './game/controller'
 import { toScreen, upsetEntities } from './game/render'
@@ -23,6 +26,9 @@ import type { GameError } from './game/types'
 // La vue 3D (Three.js) est chargée à part : l'écran-titre s'affiche tout de suite.
 const loadGameView = () => import('./app/GameView')
 const GameView = lazy(loadGameView)
+// L'intro aussi : elle ne pèse rien sur l'écran-titre.
+const loadIntro = () => import('./scene/intro/IntroScene')
+const IntroScene = lazy(loadIntro)
 
 const apiConfig = readApiConfig()
 // Lu une seule fois au chargement ; le jeton est retiré de la barre d'adresse.
@@ -59,25 +65,67 @@ export default function App() {
     if (victoryKey && victory.stage === 'room' && doorKey !== victoryKey) setDoorKey(victoryKey)
   }, [victoryKey, victory.stage, doorKey])
 
-  // [ESPACE] / [ENTRÉE] : passer directement à l'écran final.
-  const skippable = (defeatStage !== null && defeatStage !== 'over') || (victoryStage !== null && victoryStage !== 'screen')
+  // L'intro : voulue dès le clic, lancée quand sa scène et sa voix sont prêtes.
+  const [introWanted, setIntroWanted] = useState(false)
+  const [introKey, setIntroKey] = useState<string | null>(null)
+  const intro = useTimeline(INTRO_TIMELINE, introKey)
+  const introStage = intro.stage
+  const introPlaying = introWanted && introStage !== 'done'
+  useEffect(() => {
+    if (!introWanted) return
+    let live = true
+    Promise.all([loadIntro(), recordingReady('news-broadcast', 2500)])
+      .then(() => {
+        if (live) setIntroKey('intro')
+      })
+      .catch(() => {
+        // Scène introuvable (réseau) : on va directement au jeu.
+        if (live) setIntroWanted(false)
+      })
+    return () => {
+      live = false
+    }
+  }, [introWanted])
+
+  // [ESPACE] / [ENTRÉE] : passer l'intro, ou aller directement à l'écran final.
+  const skippable = (introPlaying && introStage !== null) || (defeatStage !== null && defeatStage !== 'over') || (victoryStage !== null && victoryStage !== 'screen')
   useEffect(() => {
     if (!skippable) return
     const onKey = (e: KeyboardEvent) => {
       if (e.code !== 'Space' && e.code !== 'Enter') return
       e.preventDefault()
+      // La touche encore enfoncée depuis [ ENTRER ] ne passe pas l'intro.
+      if (e.repeat) return
       stopSounds()
-      if (defeatStage) defeat.skip()
+      if (introPlaying) intro.skip()
+      else if (defeatStage) defeat.skip()
       else if (victoryKey) setSkippedVictory(victoryKey)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [skippable, defeatStage, defeat, victoryKey])
+  }, [skippable, defeatStage, defeat, victoryKey, introPlaying, intro])
 
   useEffect(() => {
     void loadGameView()
+    void loadIntro()
     preloadSounds()
   }, [])
+
+  // Outil de test, absent du build de production : rejouer l'intro, depuis une étape.
+  const jumpIntro = intro.jump
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const debug = window as unknown as { __qhIntro?: (stage?: string) => void }
+    debug.__qhIntro = (stage = 'news') => {
+      stopSounds()
+      setIntroWanted(true)
+      setIntroKey('intro')
+      jumpIntro(stage as IntroStage)
+    }
+    return () => {
+      delete debug.__qhIntro
+    }
+  }, [jumpIntro])
 
   // Outil de test, absent du build de production : rejouer une étape de la défaite.
   const jumpDefeat = defeat.jump
@@ -124,7 +172,19 @@ export default function App() {
     requestFullscreen()
     setEntered(true)
     setLaunchError(null)
-    if ((await enterGame(game, launch.token, store)) === 'no-token') setLaunchError(NO_TOKEN_ERROR)
+    // Pas de session à reprendre : l'intro part sans attendre le serveur, le jeu se prépare derrière.
+    if (wantsIntro(store)) {
+      markIntroSeen(store)
+      setIntroWanted(true)
+    }
+    const result = await enterGame(game, launch.token, store)
+    if (result === 'no-token') {
+      setLaunchError(NO_TOKEN_ERROR)
+    } else if (result === 'started' && !introSeen(store)) {
+      // La session mémorisée n'existait plus : c'est bien une première entrée.
+      markIntroSeen(store)
+      setIntroWanted(true)
+    }
   }
 
   const replay = () => {
@@ -146,7 +206,7 @@ export default function App() {
   const inGame = screen === 'explore' || screen === 'question' || screen === 'victory' || screen === 'defeat'
   // Curseur visible pour viser le panneau et sur les écrans 2D ; caché en exploration
   // (réticule) et pendant les fins (les écrans finaux le rétablissent).
-  const cursorHidden = entered && !launchError && inGame && snapshot.phase !== 'question'
+  const cursorHidden = entered && !launchError && (introPlaying || (inGame && snapshot.phase !== 'question'))
 
   let content
   if (!entered) {
@@ -155,6 +215,13 @@ export default function App() {
     content = <ErrorScreen error={launchError} />
   } else if (screen === 'error' && snapshot.error) {
     content = <ErrorScreen error={snapshot.error} onRetry={snapshot.error.code === 'NO_TOKEN' ? undefined : retry} />
+  } else if (introPlaying) {
+    content = (
+      <Suspense fallback={<LoadingScreen />}>
+        {introStage ? <IntroScene stage={introStage} /> : <LoadingScreen />}
+        {skippable && <div className="skip-hint">[ESPACE] PASSER</div>}
+      </Suspense>
+    )
   } else if (!inGame) {
     content = <LoadingScreen />
   } else {
@@ -172,6 +239,7 @@ export default function App() {
         {victoryStage && <VictoryOverlay stage={victoryStage} />}
         {victoryStage === 'screen' && <VictoryScreen key={snapshot.sessionId} snapshot={snapshot} onReplay={replay} />}
         {skippable && <div className="skip-hint">[ESPACE] PASSER</div>}
+        {introWanted && <div className="intro-wake" aria-hidden onAnimationEnd={() => setIntroWanted(false)} />}
       </Suspense>
     )
   }

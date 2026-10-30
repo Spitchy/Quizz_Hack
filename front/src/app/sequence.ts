@@ -49,6 +49,32 @@ export const DOOR_TIMELINE: Timeline<VictoryStage> = [
   ['screen', 3100],
 ]
 
+/**
+ * Intro, à la toute première entrée : le bulletin plein écran, un seul
+ * mouvement de recul jusqu'au téléphone dans ses mains, le téléphone dans la
+ * poche, le regard vers la pluie. La camionnette noire arrive, la porte glisse,
+ * il court, le coup de batte part, noir, le jeu commence.
+ */
+export type IntroStage = 'news' | 'pull' | 'watch' | 'pocket' | 'look' | 'van' | 'door' | 'run' | 'swing' | 'black' | 'done'
+export const INTRO_TIMELINE: Timeline<IntroStage> = [
+  ['news', 0],
+  ['pull', 11000],
+  ['watch', 14500],
+  ['pocket', 21400],
+  ['look', 23400],
+  ['van', 27000],
+  ['door', 30600],
+  ['run', 32400],
+  ['swing', 35600],
+  ['black', 36200],
+  ['done', 39000],
+]
+
+/** Début d'une étape (s) depuis le début de la séquence. */
+export function stageStart<S extends string>(timeline: Timeline<S>, stage: S): number {
+  return (timeline.find(([s]) => s === stage)?.[1] ?? 0) / 1000
+}
+
 /** Étape en cours `elapsed` ms après le début de la séquence. */
 export function stageAt<S extends string>(timeline: Timeline<S>, elapsed: number): S {
   let current = timeline[0][0]
