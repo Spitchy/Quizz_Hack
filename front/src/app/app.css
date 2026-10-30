@@ -753,6 +753,9 @@
   outline-offset: 2px;
 }
 
+/* Noir total : rien ne reste à l'écran. */
+.qh-blackout .sound { opacity: 0; pointer-events: none; }
+
 /* --- Le dossier du médecin ------------------------------------------------- */
 
 .file {

@@ -48,7 +48,25 @@ export function clearSessionId(store: KeyValueStore | null): void {
   }
 }
 
+const SCARE_KEY = 'quizzhack.scaredSession'
 const INTRO_KEY = 'quizzhack.introSeen'
+
+/** La session où le dossier a déjà été refermé : une partie reprise ne rejoue pas la scène. */
+export function loadScaredSession(store: KeyValueStore | null): string | null {
+  try {
+    return store?.getItem(SCARE_KEY) || null
+  } catch {
+    return null
+  }
+}
+
+export function saveScaredSession(store: KeyValueStore | null, sessionId: string): void {
+  try {
+    store?.setItem(SCARE_KEY, sessionId)
+  } catch {
+    // Sans mémoire : la scène reviendrait seulement après un rechargement.
+  }
+}
 
 /** L'intro passe une fois par onglet, à la première vraie entrée. */
 export function introSeen(store: KeyValueStore | null): boolean {

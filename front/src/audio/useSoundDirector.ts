@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react'
-import type { DefeatStage, IntroStage, VictoryStage } from '../app/sequence'
+import type { DefeatStage, IntroStage, ScareStage, VictoryStage } from '../app/sequence'
 import { dangerLevel } from '../game/render'
 import type { GameSnapshot } from '../game/types'
 import { CUES, type Cue } from './cues'
-import { duck, enterMoment, playOnTv, playSound, setDanger } from './engine'
+import { duck, enterMoment, playOnTv, playSound, playWet, setDanger, setHushed } from './engine'
 import { introMoment, momentFor, type Moment } from './mix'
 import { playAt, playEntityAnger, playEntityRelease } from './stage'
 
@@ -14,6 +14,7 @@ function playCues(moment: Moment): void {
 function playCue(cue: Cue): void {
   const options = { delay: cue.at, gain: cue.gain, rate: cue.rate }
   if (cue.tv) playOnTv(cue.sound, options)
+  else if (cue.wet) playWet(cue.sound, options)
   else if (cue.where) playAt(cue.sound, cue.where, options)
   else playSound(cue.sound, options)
   const kind = cue.duck
@@ -24,13 +25,23 @@ function playCue(cue: Cue): void {
  * Le chef d'orchestre : traduit l'état du jeu (déjà dérivé du serveur) en
  * moments sonores et en sons datés. Ne décide jamais d'une règle : il écoute.
  */
-export function useSoundDirector(snapshot: GameSnapshot, defeat: DefeatStage | null, victory: VictoryStage | null): void {
-  const moment = momentFor(snapshot.phase, defeat, victory)
+export function useSoundDirector(
+  snapshot: GameSnapshot,
+  defeat: DefeatStage | null,
+  victory: VictoryStage | null,
+  scare: ScareStage | null,
+  hushed: boolean,
+): void {
+  const moment = momentFor(snapshot.phase, defeat, victory, scare)
   const danger = dangerLevel(snapshot)
 
   useEffect(() => {
     setDanger(danger)
   }, [danger])
+
+  useEffect(() => {
+    setHushed(hushed)
+  }, [hushed])
 
   useEffect(() => {
     enterMoment(moment)

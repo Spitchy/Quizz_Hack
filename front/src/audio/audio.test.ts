@@ -1,11 +1,12 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { beatSchedule, DEFEAT_TIMELINE, DOOR_TIMELINE, INTRO_TIMELINE, VICTORY_TIMELINE } from '../app/sequence'
+import { beatSchedule, DEFEAT_TIMELINE, DOOR_TIMELINE, INTRO_TIMELINE, SCARE_TIMELINE, VICTORY_TIMELINE } from '../app/sequence'
 import type { Phase } from '../game/types'
 import { generateCorridor } from '../maze/corridor'
 import { isFloor, TILE_SIZE } from '../maze/generate'
 import { ARCHETYPES } from '../scene/entities/archetypes'
 import { neonFlicker, neonIntensity } from '../scene/flicker'
+import { JUMP_AT, SCARE_SECONDS } from '../scene/scareMotion'
 import { collapseSounds, CUES, isBoneHit, MOMENT_SECONDS } from './cues'
 import { advanceStride, createStride } from './footsteps'
 import {
@@ -118,12 +119,25 @@ describe('le silence, une fois le dossier refermé', () => {
     expect(mixFor('freeze', true).timeline?.some((step) => step.target === 'radio')).toBe(false)
     expect(mixFor('freeze', true).levels.heartbeat).toBe(MIXES.freeze.levels.heartbeat)
   })
+
+  it('reste silencieux quand la lumière revient', () => {
+    expect(Object.keys(MIXES.scareRestore.levels)).toEqual(['heartbeat'])
+    expect(MIXES.scareDark.levels.radio ?? 0).toBe(0)
+  })
 })
 
 describe('intro et scène du dossier', () => {
   it('a une balance et un moment pour chaque étape', () => {
     for (const [stage] of INTRO_TIMELINE) expect(MIXES[introMoment(stage)], stage).toBeDefined()
     expect(introMoment('done')).toBe('silent')
+    for (const [stage] of SCARE_TIMELINE) {
+      if (stage !== 'done') expect(MIXES[momentFor('exploring', null, null, stage)], stage).toBeDefined()
+    }
+    expect(momentFor('exploring', null, null, 'done')).toBe('corridor')
+  })
+
+  it('laisse les fins passer avant la scène du dossier', () => {
+    expect(momentFor('gameOver', 'beat', null, 'torch')).toBe('beat')
   })
 
   it('fait entendre la pluie et le moteur seulement dehors', () => {
@@ -132,6 +146,20 @@ describe('intro et scène du dossier', () => {
     expect(MIXES.introNews.levels.tv).toBeGreaterThan(0)
     expect(MIXES.introPocket.levels.tv ?? 0).toBe(0)
     expect(MIXES.introPocket.levels.tvSmall ?? 0).toBe(0)
+  })
+
+  it('date les cris sur la scène : les cordes, le piano et le choc arrivent avec lui', () => {
+    const jump = CUES.scareJump!
+    for (const sound of ['violin-screech', 'piano-cluster', 'stinger'] as const) {
+      expect(jump.find((c) => c.sound === sound)?.at, sound).toBe(JUMP_AT)
+    }
+    expect(CUES.scareTorch!.some((c) => c.sound === 'violin-tension')).toBe(true)
+  })
+
+  it('coupe les cordes avant qu\u2019il saute : un instant de silence', () => {
+    const tension = CUES.scareTorch!.find((c) => c.sound === 'violin-tension')!
+    const seconds = 4.5
+    expect(tension.at + seconds).toBeLessThanOrEqual(SCARE_SECONDS.torch + JUMP_AT)
   })
 })
 

@@ -70,6 +70,29 @@ export const INTRO_TIMELINE: Timeline<IntroStage> = [
   ['done', 39000],
 ]
 
+/**
+ * Le dossier refermé, une seule fois par partie. Le joueur garde la main pendant
+ * que les lampes meurent une à une (`dim`). Noir total : tout est écrit. Il allume
+ * sa lampe, regarde à droite, à gauche, et le faisceau trouve le médecin droit
+ * devant (`torch`), qui lui saute dessus (`jump`). Le coup de pied le repousse et
+ * lui fait lâcher la lampe (`kick`, `drop`) ; il la ramasse (`pick`), braque le
+ * couloir : personne (`search`). La lumière revient. Purement visuel : aucun appel
+ * au serveur.
+ */
+export type ScareStage = 'dim' | 'dark' | 'torch' | 'jump' | 'kick' | 'drop' | 'pick' | 'search' | 'restore' | 'done'
+export const SCARE_TIMELINE: Timeline<ScareStage> = [
+  ['dim', 0],
+  ['dark', 8000],
+  ['torch', 9200],
+  ['jump', 14400],
+  ['kick', 16000],
+  ['drop', 16900],
+  ['pick', 18700],
+  ['search', 19900],
+  ['restore', 22700],
+  ['done', 24500],
+]
+
 /** Début d'une étape (s) depuis le début de la séquence. */
 export function stageStart<S extends string>(timeline: Timeline<S>, stage: S): number {
   return (timeline.find(([s]) => s === stage)?.[1] ?? 0) / 1000

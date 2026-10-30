@@ -18,9 +18,11 @@ import {
   clearSessionId,
   enterGame,
   introSeen,
+  loadScaredSession,
   loadSessionId,
   markIntroSeen,
   readLaunch,
+  saveScaredSession,
   saveSessionId,
   wantsIntro,
   type KeyValueStore,
@@ -84,7 +86,7 @@ describe('mémorisation de session', () => {
   })
 })
 
-describe('première entrée', () => {
+describe('première entrée et scène du dossier', () => {
   it('montre l\u2019intro à une vraie première entrée, une seule fois', () => {
     const store = memoryStore()
     expect(wantsIntro(store)).toBe(true)
@@ -99,12 +101,23 @@ describe('première entrée', () => {
     expect(wantsIntro(store)).toBe(false)
   })
 
+  it('se souvient de la session où le dossier a été refermé, et d\u2019elle seule', () => {
+    const store = memoryStore()
+    expect(loadScaredSession(store)).toBeNull()
+    saveScaredSession(store, 'partie-1')
+    expect(loadScaredSession(store)).toBe('partie-1')
+    saveScaredSession(store, 'partie-2')
+    expect(loadScaredSession(store)).toBe('partie-2')
+  })
+
   it('ne casse rien sans stockage', () => {
     for (const store of [null, brokenStore]) {
       expect(wantsIntro(store)).toBe(true)
       expect(introSeen(store)).toBe(false)
+      expect(loadScaredSession(store)).toBeNull()
       expect(() => {
         markIntroSeen(store)
+        saveScaredSession(store, 'x')
       }).not.toThrow()
     }
   })

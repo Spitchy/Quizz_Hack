@@ -1,4 +1,4 @@
-import type { DefeatStage, IntroStage, VictoryStage } from '../app/sequence'
+import type { DefeatStage, IntroStage, ScareStage, VictoryStage } from '../app/sequence'
 import type { Phase } from '../game/types'
 
 // Mixage, en fonctions pures : quel « moment » du jeu on vit, quel niveau pour
@@ -38,6 +38,16 @@ export type Moment =
   | 'introRun'
   | 'introSwing'
   | 'introBlack'
+  // Le dossier refermé : les lumières meurent, le médecin surgit.
+  | 'scareDim'
+  | 'scareDark'
+  | 'scareTorch'
+  | 'scareJump'
+  | 'scareKick'
+  | 'scareDrop'
+  | 'scarePick'
+  | 'scareSearch'
+  | 'scareRestore'
 
 const INTRO_MOMENTS: Record<Exclude<IntroStage, 'done'>, Moment> = {
   news: 'introNews',
@@ -56,9 +66,22 @@ export function introMoment(stage: IntroStage): Moment {
   return stage === 'done' ? 'silent' : INTRO_MOMENTS[stage]
 }
 
-export function momentFor(phase: Phase, defeat: DefeatStage | null, victory: VictoryStage | null): Moment {
+const SCARE_MOMENTS: Record<Exclude<ScareStage, 'done'>, Moment> = {
+  dim: 'scareDim',
+  dark: 'scareDark',
+  torch: 'scareTorch',
+  jump: 'scareJump',
+  kick: 'scareKick',
+  drop: 'scareDrop',
+  pick: 'scarePick',
+  search: 'scareSearch',
+  restore: 'scareRestore',
+}
+
+export function momentFor(phase: Phase, defeat: DefeatStage | null, victory: VictoryStage | null, scare: ScareStage | null = null): Moment {
   if (defeat) return defeat
   if (victory) return victory === 'screen' ? 'outside' : victory
+  if (scare && scare !== 'done') return SCARE_MOMENTS[scare]
   switch (phase) {
     case 'exploring':
       return 'corridor'
@@ -316,6 +339,35 @@ export const MIXES: Record<Moment, MomentMix> = {
       { at: 1.6, target: 'tinnitus', to: 0, fade: 0.6 },
     ],
   },
+
+  // --- Le dossier refermé ---
+  // Le courant lâche : le disque s'effondre avec les lampes, jusqu'au silence.
+  scareDim: {
+    levels: { roomTone: 0.32, neon: 0.45, heartbeat: 1, breath: 0.8, radio: 0.7 },
+    fade: 0.4,
+    room: 'corridor',
+    timeline: [
+      { at: 2.6, target: 'radio', to: 0, fade: 0.9 },
+      { at: 4.5, target: 'roomTone', to: 0, fade: 1.2 },
+      { at: 5.5, target: 'neon', to: 0, fade: 0.8 },
+    ],
+  },
+  // Plus rien : le cœur, et le souffle qu'il retient.
+  scareDark: {
+    levels: { heartbeat: 1, breath: 0.5 },
+    fade: 0.3,
+    room: 'corridor',
+    timeline: [{ at: 0.7, target: 'breath', to: 0.25, fade: 0.3 }],
+  },
+  scareTorch: { levels: { heartbeat: 1, breath: 0.7, drone: 0.7 }, fade: 0.5, room: 'corridor' },
+  scareJump: { levels: { heartbeat: 1, breath: 1.2 }, fade: 0.03, room: 'corridor' },
+  scareKick: { levels: { heartbeat: 1, breath: 1.2 }, fade: 0.05, room: 'corridor' },
+  // Sonné, il reprend son souffle ; plus il cherche, plus il le retient.
+  scareDrop: { levels: { heartbeat: 1, breath: 1.2 }, fade: 0.3, room: 'corridor' },
+  scarePick: { levels: { heartbeat: 1, breath: 0.9 }, fade: 0.3, room: 'corridor' },
+  scareSearch: { levels: { heartbeat: 1, breath: 0.5 }, fade: 0.6, room: 'corridor', timeline: [{ at: 1, target: 'breath', to: 0.15, fade: 0.5 }] },
+  // La lumière revient, pas le son : c'est le silence qui commence.
+  scareRestore: { levels: { heartbeat: 1 }, fade: 0.6, room: 'corridor' },
 }
 
 /** Les moments de l'exploration, là où le silence s'installe après le dossier. */
@@ -350,6 +402,8 @@ export function musicSpeed(moment: Moment): MusicSpeed {
   switch (moment) {
     case 'freeze':
       return { rate: 0.3, glide: 0.8 }
+    case 'scareDim':
+      return { rate: 0.3, glide: 3.2 }
     case 'inject':
       return { rate: 0.72, glide: 0.1 }
     case 'infected':

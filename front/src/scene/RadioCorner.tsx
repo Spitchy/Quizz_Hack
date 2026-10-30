@@ -38,9 +38,13 @@ interface RadioCornerProps {
   spot: RadioSpot
   /** Courant coupé : le cadran s'éteint avec les néons. */
   dark: boolean
+  /** Le dossier a disparu de la table. */
+  paperGone: boolean
+  /** Noir total : même le cadran n'existe plus. */
+  blackout: boolean
 }
 
-export function RadioCorner({ spot, dark }: RadioCornerProps) {
+export function RadioCorner({ spot, dark, paperGone, blackout }: RadioCornerProps) {
   const mats = useMemo(() => createMaterials(), [])
   const { texture, ctx } = useMemo(() => {
     const el = document.createElement('canvas')
@@ -65,7 +69,7 @@ export function RadioCorner({ spot, dark }: RadioCornerProps) {
 
   const dial = useRef<MeshBasicMaterial>(null)
   useFrame(({ clock }) => {
-    if (dial.current) dial.current.color.copy(DIAL).multiplyScalar(dark ? 0.03 : 0.9 * neonFlicker(clock.elapsedTime * 0.4, 0.15, 21))
+    if (dial.current) dial.current.color.copy(DIAL).multiplyScalar(blackout ? 0 : dark ? 0.03 : 0.9 * neonFlicker(clock.elapsedTime * 0.4, 0.15, 21))
   })
 
   const legs: [number, number][] = [
@@ -109,7 +113,7 @@ export function RadioCorner({ spot, dark }: RadioCornerProps) {
       </group>
 
       {/* Le dossier, posé de travers, des feuilles qui dépassent, et une tasse froide. */}
-      <group position={[0.22, 0.762, 0.02]} rotation={[0, -0.14, 0]}>
+      <group visible={!paperGone} position={[0.22, 0.762, 0.02]} rotation={[0, -0.14, 0]}>
         <mesh position={[0.006, 0.004, 0.004]} rotation={[0, 0.03, 0]} material={mats.sheets}>
           <boxGeometry args={[0.31, 0.012, (0.31 * FILE_HEIGHT) / FILE_WIDTH]} />
         </mesh>

@@ -671,6 +671,11 @@ export function playSound(name: SoundName, options: PlayOptions = {}): void {
   if (graph) connectSource(graph, name, graph.buses[options.bus ?? 'effects'], options)
 }
 
+/** Joue un son sans position, mais qui résonne dans la pièce où l'on est. */
+export function playWet(name: SoundName, options: PlayOptions = {}): void {
+  if (graph) connectSource(graph, name, graph.spatialEffects, options)
+}
+
 /** Joue un son par le bulletin de l'intro. */
 export function playOnTv(name: SoundName, options: PlayOptions = {}): void {
   if (graph) connectSource(graph, name, graph.tvInput, options)

@@ -128,6 +128,127 @@ export function batSwing(rate: number, random: Random): Samples {
   return normalize(fadeEdges(out, rate, 0.004, 0.01), 0.85)
 }
 
+/** Disjoncteur : le bloc qui claque, dans le mur, puis la lampe qui lâche. */
+export function breaker(rate: number, random: Random): Samples {
+  const out = alloc(0.34, rate)
+  const body = new Resonator(120, 30, rate)
+  const tick = new Biquad('bandpass', 2600, 1.8, rate)
+  for (let i = 0; i < out.length; i++) {
+    const t = i / rate
+    const tail = t - 0.05
+    out[i] = body.tick(i < 12 ? (random() * 2 - 1) * 4 : 0) * 0.9 + tick.tick(random() * 2 - 1) * (decay(t, 0.004) * 1.4 + (tail > 0 ? decay(tail, 0.05) * 0.1 : 0))
+  }
+  return normalize(fadeEdges(out, rate, 0.0005, 0.04), 0.85)
+}
+
+// --- Le dossier refermé : film d'horreur ---------------------------------------
+
+/** Une lampe de métal qui tombe : le choc, deux rebonds, puis elle roule et s'arrête. */
+export function torchClatter(rate: number, random: Random): Samples {
+  const seconds = 1.3
+  const out = alloc(seconds, rate)
+  const ring = (at: number, level: number) => {
+    const piece = alloc(0.16, rate)
+    for (const [hz, q] of [[2150, 60], [3370, 80], [870, 35]] as const) {
+      const body = new Resonator(hz * (0.98 + random() * 0.04), q, rate)
+      for (let i = 0; i < piece.length; i++) piece[i] += body.tick(i < 14 ? (random() * 2 - 1) * 3 : 0)
+    }
+    addAt(out, piece, at, rate, level)
+  }
+  ring(0, 1)
+  ring(0.2, 0.55)
+  ring(0.33, 0.3)
+  const roll = new Biquad('bandpass', 900, 1.8, rate)
+  for (let i = 0; i < out.length; i++) {
+    const t = i / rate
+    if (t > 0.4) out[i] += roll.tick(random() * 2 - 1) * (0.8 + 0.2 * Math.sin(t * 60)) * 0.3 * Math.max(0, 1 - (t - 0.4) / 0.8)
+  }
+  return normalize(fadeEdges(out, rate, 0.0005, 0.05), 0.9)
+}
+
+/** Touches dissonantes, à pleines mains dans le grave d'un piano désaccordé. */
+export function pianoCluster(rate: number, random: Random): Samples {
+  const seconds = 4
+  const out = alloc(seconds, rate)
+  const notes = [55, 58.27, 61.74, 82.41, 87.31, 116.54, 123.47, 174.61]
+  for (const f of notes) {
+    const detune = 1 + (random() - 0.5) * 0.012
+    const strike = random() * 0.012
+    for (let n = 1; n <= 7; n++) {
+      // Les cordes du piano sont raides : les harmoniques montent un peu trop haut.
+      const hz = f * detune * n * Math.sqrt(1 + 0.0009 * n * n)
+      const tau = 2.3 / n ** 0.75
+      const level = 1 / n ** 1.1
+      const step = (TAU * hz) / rate
+      const start = Math.round(strike * rate)
+      for (let i = start; i < out.length; i++) {
+        const t = (i - start) / rate
+        out[i] += Math.sin(step * (i - start)) * level * hitEnv(t, 0.003, tau)
+      }
+    }
+  }
+  // Le marteau et la caisse : un choc sec, sourd.
+  const felt = new Biquad('lowpass', 900, 0.7, rate)
+  for (let i = 0; i < out.length; i++) {
+    const t = i / rate
+    out[i] = softClip(out[i] * 0.34 + felt.tick(random() * 2 - 1) * decay(t, 0.03) * 1.6, 1.3)
+  }
+  return normalize(fadeEdges(out, rate, 0.001, 0.4), 0.95)
+}
+
+/** Archet : une dent de scie, pas très propre, passée dans le corps du violon. */
+function violinTone(out: Samples, rate: number, random: Random, hz: (t: number) => number, level: (t: number) => number, scratch: number): void {
+  const bodyLow = new Biquad('bandpass', 2900, 1.4, rate)
+  const bodyHigh = new Biquad('bandpass', 5400, 1.8, rate)
+  let phase = random()
+  for (let i = 0; i < out.length; i++) {
+    const t = i / rate
+    const amount = level(t)
+    if (amount <= 0) continue
+    phase = (phase + hz(t) / rate) % 1
+    const raw = (phase * 2 - 1) * (1 + scratch * 0.4) + (random() * 2 - 1) * scratch
+    out[i] += (bodyLow.tick(raw) * 1.5 + bodyHigh.tick(raw) * 0.9) * amount
+  }
+}
+
+/** Les cordes montent : aigu serré, trémolo, de plus en plus fort, coupé net à la fin. */
+export function violinTension(rate: number, random: Random): Samples {
+  const seconds = 4.5
+  const out = alloc(seconds, rate)
+  const notes = [1046.5, 1108.7, 1174.7, 1244.5, 1318.5]
+  notes.forEach((f, voice) => {
+    const vibrato = 5.2 + voice * 0.6
+    const off = random() * TAU
+    const hz = (t: number) => f * (1 + (t / seconds) ** 2 * 0.09) * (1 + Math.sin(TAU * vibrato * t + off) * 0.006)
+    const level = (t: number) => ((t / seconds) ** 2.2 * 0.92 + 0.03) * (0.72 + 0.28 * Math.sin(TAU * (9 + voice) * t + off))
+    violinTone(out, rate, random, hz, level, 0.22)
+  })
+  return normalize(fadeEdges(out, rate, 0.2, 0.012), 0.9)
+}
+
+/** Le cri : l'archet qui frappe, cinq coups stridents, puis une plainte qui monte et grince. */
+export function violinScreech(rate: number, random: Random): Samples {
+  const seconds = 3.1
+  const out = alloc(seconds, rate)
+  const stabs = [0, 0.15, 0.3, 0.45, 0.62]
+  const notes = [2093, 2217.5, 2489, 2637, 3136, 3322.4]
+  notes.forEach((f) => {
+    const off = random() * TAU
+    const hz = (t: number) => {
+      const fall = stabs.reduce((last, at) => (t >= at ? t - at : last), 0)
+      const scream = Math.max(0, t - 0.8)
+      return f * (1 - fall * 0.05 * (t < 0.8 ? 1 : 0)) * (1 + scream * 0.16) * (1 + Math.sin(TAU * 7.4 * t + off) * (0.006 + scream * 0.012))
+    }
+    const level = (t: number) => {
+      if (t < 0.8) return stabs.reduce((sum, at) => (t >= at ? sum + hitEnv(t - at, 0.003, 0.09) : sum), 0)
+      return 0.75 * Math.min(1, (t - 0.8) / 0.12) * Math.max(0, 1 - (t - 0.8) / (seconds - 0.8)) ** 0.7
+    }
+    violinTone(out, rate, random, hz, level, 0.5)
+  })
+  for (let i = 0; i < out.length; i++) out[i] = softClip(out[i] * 0.55, 1.8)
+  return normalize(fadeEdges(out, rate, 0.001, 0.2), 0.96)
+}
+
 // --- Verdict d'une réponse -----------------------------------------------------
 
 /** Mauvaise réponse : le choc. Grappe dissonante, chute dans le grave, éclats du panneau. */

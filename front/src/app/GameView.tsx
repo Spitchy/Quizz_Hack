@@ -4,16 +4,19 @@ import { toHudState, toWorldState } from '../game/render'
 import type { GameSnapshot } from '../game/types'
 import { generateCorridor } from '../maze/corridor'
 import { generateExitRoom, reachedDoor } from '../maze/exitRoom'
-import { generateMaze } from '../maze/generate'
+import { generateMaze, tileCenter } from '../maze/generate'
 import { canReachRadio, radioSpot } from '../maze/radioSpot'
+import { scareLane, type ScareLane } from '../maze/scareLane'
 import { entityDistanceMaps, nearestEntityDistance, signalStrength } from '../maze/physics'
 import { MazeScene, type PlayerInfo } from '../scene/MazeScene'
+import { canWalk, fileVanished, isPitchBlack } from '../scene/scareMotion'
 import { readApiConfig } from '../api'
 import { playSound } from '../audio/engine'
 import { useSoundDirector } from '../audio/useSoundDirector'
 import { mockCorrectAnswer } from '../api/mock'
 import { directionFromTurn, readMazeLayout, readShowAnswers } from './config'
-import type { DefeatStage, VictoryStage } from './sequence'
+import { SCARE_TIMELINE, useTimeline, type DefeatStage, type ScareStage, type VictoryStage } from './sequence'
+import { browserStore, loadScaredSession, saveScaredSession } from './session'
 import { Hud } from './Hud'
 import { VictimFileOverlay } from './FileOverlay'
 
@@ -29,6 +32,8 @@ const SHOW_ANSWERS = readShowAnswers(
 )
 
 const EXIT_ROOM = generateExitRoom()
+const store = browserStore()
+const NO_LANE: ScareLane = { yaw: 0, dir: { x: 0, z: -1 }, reach: 0 }
 
 interface GameViewProps {
   game: GameController
@@ -56,7 +61,34 @@ function usePointerLocked(): boolean {
 
 export default function GameView({ game, snapshot, defeatStage, victoryStage, onReachDoor }: GameViewProps) {
   const { question, phase, sessionId, totalIntersections } = snapshot
-  useSoundDirector(snapshot, defeatStage, victoryStage)
+
+  // Le dossier refermé, une fois par partie : mémorisé pour survivre à une reprise,
+  // oublié à la partie suivante (autre session).
+  const [scaredSession, setScaredSession] = useState(() => loadScaredSession(store))
+  const scared = scaredSession !== null && scaredSession === sessionId
+  const [scareRun, setScareRun] = useState<string | null>(null)
+  const scareKey = scareRun !== null && scareRun === sessionId ? scareRun : null
+  const { stage: scareStage, jump: jumpScare } = useTimeline(SCARE_TIMELINE, scareKey)
+  const scaring = scareStage !== null && scareStage !== 'done'
+
+  // Outil de test, absent du build de production : rejouer une étape de la scène du dossier.
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    const debug = window as unknown as { __qhScare?: (stage: ScareStage) => void }
+    debug.__qhScare = jumpScare
+    return () => {
+      delete debug.__qhScare
+    }
+  }, [jumpScare])
+
+  useSoundDirector(snapshot, defeatStage, victoryStage, scaring ? scareStage : null, scared)
+
+  // Noir total : même le réglage du son disparaît de l'image.
+  const pitchBlack = isPitchBlack(scareStage)
+  useEffect(() => {
+    document.body.classList.toggle('qh-blackout', pitchBlack)
+    return () => document.body.classList.remove('qh-blackout')
+  }, [pitchBlack])
   // Le même sessionId redonne le même labyrinthe : une partie reprise retrouve ses lieux.
   const maze = useMemo(() => {
     const options = { seed: sessionId ?? 'local', entityCount: Math.max(1, totalIntersections) }
@@ -77,7 +109,7 @@ export default function GameView({ game, snapshot, defeatStage, victoryStage, on
   const lastAnswerYaw = useRef<number | null>(null)
   const mouseLook = usePointerLocked()
   const [paperOpen, setPaperOpen] = useState(false)
-  const canRead = phase === 'exploring' && !defeatStage && !victoryStage && canReachRadio(maze, radio, tile)
+  const canRead = phase === 'exploring' && !defeatStage && !victoryStage && !scared && canReachRadio(maze, radio, tile)
   // S'il n'est plus à portée (la partie a pu changer), le dossier se referme.
   const reading = paperOpen && canRead
 
@@ -118,10 +150,23 @@ export default function GameView({ game, snapshot, defeatStage, victoryStage, on
     setPaperOpen(false)
     void (pointerWas.current?.requestPointerLock?.() as Promise<void> | undefined)?.catch?.(() => {})
     pointerWas.current = null
-  }, [])
+    if (!sessionId) return
+    saveScaredSession(store, sessionId)
+    setScaredSession(sessionId)
+    setScareRun(sessionId)
+  }, [sessionId])
+
+  // Il marche encore quand le noir tombe : le couloir d'où vient le médecin suit sa position.
+  const lane = useMemo(() => {
+    if (!tile) return null
+    const avoid = maze.entities.map((e) => ({ ...tileCenter(e), radius: 0.4 }))
+    if (radio) avoid.push(radio.obstacle)
+    return scareLane(maze, tile, avoid)
+  }, [maze, radio, tile])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (scaring) return
       if (phase === 'exploring') {
         if (reading) {
           if (e.code === 'KeyE' || e.key === 'Escape') {
@@ -158,7 +203,7 @@ export default function GameView({ game, snapshot, defeatStage, victoryStage, on
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [phase, question, near, engage, answer, keyPick, hover, game, reading, canRead, openFile, closeFile])
+  }, [phase, question, near, engage, answer, keyPick, hover, game, reading, canRead, scaring, openFile, closeFile])
 
   const highlight =
     phase === 'question'
@@ -175,7 +220,9 @@ export default function GameView({ game, snapshot, defeatStage, victoryStage, on
       <MazeScene
         maze={maze}
         radio={radio}
-        frozen={reading}
+        frozen={reading || !canWalk(scareStage)}
+        scare={scaring ? { stage: scareStage, lane: lane ?? NO_LANE } : null}
+        paperGone={scared && (!scaring || fileVanished(scareStage))}
         exitRoom={EXIT_ROOM}
         snapshot={snapshot}
         defeatStage={defeatStage}
@@ -187,15 +234,17 @@ export default function GameView({ game, snapshot, defeatStage, victoryStage, on
         onHoverChoice={setHover}
         onPickChoice={phase === 'question' ? answer : undefined}
       />
-      <Hud
-        hud={toHudState(snapshot)}
-        snapshot={snapshot}
-        danger={toWorldState(snapshot).danger}
-        signal={signalStrength(distance)}
-        canEngage={phase === 'exploring' && near !== null}
-        canRead={canRead && near === null}
-        mouseLook={mouseLook}
-      />
+      {canWalk(scareStage) && (
+        <Hud
+          hud={toHudState(snapshot)}
+          snapshot={snapshot}
+          danger={toWorldState(snapshot).danger}
+          signal={signalStrength(distance)}
+          canEngage={phase === 'exploring' && near !== null && !scaring}
+          canRead={canRead && near === null}
+          mouseLook={mouseLook}
+        />
+      )}
       {reading && <VictimFileOverlay pseudo={snapshot.pseudo} />}
     </>
   )
