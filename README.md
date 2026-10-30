@@ -58,4 +58,25 @@ Le jeton remplace celui que donne normalement le Hub. `.env.example` active le H
 - **La partie ne démarre pas** : vérifiez que le back tourne toujours dans le terminal 1.
 - **Port déjà utilisé** : fermez l'autre instance sur 3000 ou 5173, puis relancez.
 
-Pour le développement du front (mode sans back, tests), voir [`front/README.md`](front/README.md). Pour l'API, voir [`back/README.md`](back/README.md).
+## Tester en local sans le back
+
+Dans `front/.env.local` :
+
+```
+VITE_API_MOCK=true
+VITE_MAZE_LAYOUT=corridor
+VITE_SHOW_ANSWERS=true
+```
+
+Puis `npm run dev` dans `front/`, http://localhost:5173 et **[ ENTRER ]** : faux serveur intégré, entités alignées dans un couloir droit, bonnes réponses cochées.
+
+| Variable (`front/.env.local`) | Effet |
+| --- | --- |
+| `VITE_API_MOCK=true` | joue sans le back ni jeton |
+| `VITE_MAZE_LAYOUT=corridor` | couloir droit au lieu du labyrinthe |
+| `VITE_SHOW_ANSWERS=true` | bonnes réponses cochées (avec le faux serveur seulement) |
+| `VITE_API_BASE_URL=...` | adresse du back, `http://localhost:3000` par défaut |
+
+Côté back, `MOCK_HUB=true` dans `back/.env` évite d'avoir besoin du vrai Hub.
+
+Les options dans l'URL et les outils de la console sont décrits dans [`front/README.md`](front/README.md). Pour l'API, voir [`back/README.md`](back/README.md).

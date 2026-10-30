@@ -97,7 +97,7 @@ export default function GameView({ game, snapshot, defeatStage, victoryStage, on
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (phase === 'exploring') {
-        if ((e.code === 'KeyE' || e.key === 'Enter') && near !== null) {
+        if (e.code === 'KeyE' && near !== null) {
           e.preventDefault()
           engage(near)
         }
@@ -148,7 +148,6 @@ export default function GameView({ game, snapshot, defeatStage, victoryStage, on
         answer={SHOW_ANSWERS && question ? mockCorrectAnswer(question.id) : null}
         onNearEntity={setNear}
         onPlayerMoved={playerMoved}
-        onEngage={engage}
         onHoverChoice={setHover}
         onPickChoice={phase === 'question' ? answer : undefined}
       />

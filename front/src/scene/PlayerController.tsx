@@ -42,8 +42,6 @@ interface PlayerControllerProps {
   lightsOff: boolean
   onNearEntity: (id: number | null) => void
   onPlayerMoved: (info: PlayerInfo) => void
-  /** Clic sur une entité proche : l'aborder. */
-  onEngage: (id: number) => void
   /**
    * Défaite : le joueur est figé, ne peut que tourner la tête ; puis la caméra
    * de surveillance prend le relais (elle pose la caméra, lui n'y touche plus).
@@ -108,6 +106,8 @@ export function PlayerController(props: PlayerControllerProps) {
   // Dans le noir de la défaite, le joueur lève les yeux vers les silhouettes qui l'entourent.
   const lookUp = useRef(0)
   const near = useRef<number | null>(null)
+  // La souris était au regard quand il a abordé le panneau : elle y retourne ensuite.
+  const relock = useRef(false)
   const reported = useRef<{ key: string; yaw: number } | null>(null)
   // Défaite : début du figement (les néons meurent).
   const frozen = useRef({ stage: null as DefeatStage | null, freezeStart: 0 })
@@ -132,7 +132,7 @@ export function PlayerController(props: PlayerControllerProps) {
     }
   }, [])
 
-  // Souris : regard en pointer lock ; clic = verrouiller, ou aborder l'entité visée.
+  // Souris : regard en pointer lock, verrouillé au clic. Aborder une entité se fait à la touche E.
   useEffect(() => {
     const canvas = gl.domElement
     const onClick = () => {
@@ -142,10 +142,6 @@ export function PlayerController(props: PlayerControllerProps) {
       }
       if (lookOnly) {
         if (document.pointerLockElement !== canvas) canvas.requestPointerLock?.()?.catch?.(() => {})
-        return
-      }
-      if (near.current !== null && document.pointerLockElement === canvas) {
-        latest.current.onEngage(near.current)
         return
       }
       if (document.pointerLockElement !== canvas) {
@@ -172,15 +168,21 @@ export function PlayerController(props: PlayerControllerProps) {
     }
   }, [gl])
 
-  // Lecture d'un panneau : on libère la souris pour viser les choix.
+  // Lecture d'un panneau : on libère la souris pour viser les choix, puis elle
+  // reprend le regard dès que le joueur peut de nouveau se déplacer.
   useEffect(() => {
     if (readingEntity === null) {
       transition.current = null
+      if (relock.current && latest.current.canMove) gl.domElement.requestPointerLock?.()?.catch?.(() => {})
+      relock.current = false
       return
     }
-    if (document.pointerLockElement) document.exitPointerLock()
+    if (document.pointerLockElement) {
+      relock.current = true
+      document.exitPointerLock()
+    }
     transition.current = { from: { ...pose.current }, startedAt: null, entity: readingEntity }
-  }, [readingEntity])
+  }, [readingEntity, gl])
 
   useEffect(() => {
     if (shake > 0) trauma.current = Math.max(trauma.current, shake)

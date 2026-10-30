@@ -52,7 +52,6 @@ export interface MazeSceneProps {
   answer: number | null
   onNearEntity: (id: number | null) => void
   onPlayerMoved: (info: PlayerInfo) => void
-  onEngage: (id: number) => void
   onHoverChoice: (choice: number | null) => void
   onPickChoice?: (choice: number) => void
 }
@@ -160,7 +159,7 @@ function LightSurge({ active }: { active: boolean }) {
 
 function MazeContents(props: MazeSceneProps) {
   const { maze, snapshot, highlight, answer, defeatStage, victoryStage } = props
-  const { onNearEntity, onPlayerMoved, onEngage, onHoverChoice, onPickChoice } = props
+  const { onNearEntity, onPlayerMoved, onHoverChoice, onPickChoice } = props
   const world = toWorldState(snapshot)
 
   const placements = useMemo(
@@ -233,7 +232,6 @@ function MazeContents(props: MazeSceneProps) {
         lightsOff={world.lightsOff}
         onNearEntity={onNearEntity}
         onPlayerMoved={onPlayerMoved}
-        onEngage={onEngage}
         defeat={defeatStage ? { stage: defeatStage, faceYaw: roles.faceYaw, stand: roles.stand } : null}
         dazzled={victoryStage === 'release'}
       />
@@ -325,7 +323,6 @@ function SceneContents(props: MazeSceneProps) {
           lightsOff={false}
           onNearEntity={noop}
           onPlayerMoved={onPlayerMoved}
-          onEngage={noop}
           autoWalk={victoryStage === 'through'}
         />
         <WhiteRoom room={exitRoom} open={victoryStage === 'door' || victoryStage === 'through' || victoryStage === 'screen'} freed={freed} />
