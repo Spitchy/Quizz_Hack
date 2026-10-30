@@ -21,6 +21,7 @@ import {
   introMoment,
   LAYERS,
   MIXES,
+  mixFor,
   momentFor,
   musicSpeed,
   neonBuzzGain,
@@ -88,6 +89,34 @@ describe('moments', () => {
       for (const layer of Object.keys(mix.levels)) expect(LAYERS).toContain(layer)
       for (const step of mix.timeline ?? []) expect([...LAYERS, 'muffle']).toContain(step.target)
     }
+  })
+})
+
+describe('le silence, une fois le dossier refermé', () => {
+  const corridorMoments = ['corridor', 'reading', 'answering', 'reacting'] as const
+
+  it('ne laisse que le cœur pendant l\u2019exploration', () => {
+    for (const m of corridorMoments) {
+      expect(Object.keys(mixFor(m, true).levels), m).toEqual(['heartbeat'])
+      expect(mixFor(m, true).levels.heartbeat, m).toBeGreaterThan(0)
+    }
+  })
+
+  it('coupe bien tout ce qu\u2019on a dit : disque, pièce, néons, drone, souffle, respiration', () => {
+    const levels = mixFor('corridor', true).levels
+    for (const layer of ['radio', 'roomTone', 'neon', 'drone', 'haze', 'breath', 'monsters'] as const) expect(levels[layer] ?? 0, layer).toBe(0)
+  })
+
+  it('ne change rien tant qu\u2019il n\u2019a pas refermé le dossier', () => {
+    for (const m of Object.keys(MIXES) as Moment[]) expect(mixFor(m, false), m).toBe(MIXES[m])
+  })
+
+  it('laisse les fins telles quelles, sauf la radio, morte pour de bon', () => {
+    expect(mixFor('beat', true)).toBe(MIXES.beat)
+    expect(mixFor('infected', true).levels.music).toBe(MIXES.infected.levels.music)
+    expect(mixFor('freeze', true).levels.radio ?? 0).toBe(0)
+    expect(mixFor('freeze', true).timeline?.some((step) => step.target === 'radio')).toBe(false)
+    expect(mixFor('freeze', true).levels.heartbeat).toBe(MIXES.freeze.levels.heartbeat)
   })
 })
 

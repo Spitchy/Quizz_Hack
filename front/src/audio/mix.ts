@@ -318,6 +318,24 @@ export const MIXES: Record<Moment, MomentMix> = {
   },
 }
 
+/** Les moments de l'exploration, là où le silence s'installe après le dossier. */
+const HUSHED_MOMENTS: readonly Moment[] = ['corridor', 'reading', 'answering', 'reacting']
+
+/**
+ * La balance d'un moment. `hushed` : le dossier a été refermé, le courant n'est
+ * jamais vraiment revenu. Plus que le cœur (les pas et les verdicts sont des
+ * sons ponctuels, ils passent). Les fins se jouent comme d'habitude, mais la
+ * radio reste morte.
+ */
+export function mixFor(moment: Moment, hushed: boolean): MomentMix {
+  const mix = MIXES[moment]
+  if (!hushed) return mix
+  if (HUSHED_MOMENTS.includes(moment)) return { ...mix, levels: { heartbeat: mix.levels.heartbeat ?? 1 } }
+  if (mix.levels.radio === undefined) return mix
+  const { radio: _radio, ...levels } = mix.levels
+  return { ...mix, levels, timeline: mix.timeline?.filter((step) => step.target !== 'radio') }
+}
+
 /** Vitesse du disque : il traîne toujours un peu, ce qui baisse aussi sa hauteur. */
 export interface MusicSpeed {
   rate: number

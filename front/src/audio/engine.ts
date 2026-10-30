@@ -12,6 +12,7 @@ import {
   LAYER_TRIM,
   LAYERS,
   MIXES,
+  mixFor,
   musicSpeed,
   volumeGain,
   type Layer,
@@ -81,6 +82,7 @@ let danger = 0
 let openedAt = 0
 let abrupt = false
 let running = false
+let hushed = false
 
 /** Journal des sons joués, pour vérifier la synchronisation (outils de test). */
 const history: { sound: string; at: number; moment: Moment }[] = []
@@ -463,7 +465,7 @@ function glideMusic(g: Graph, next: Moment, immediately: boolean): void {
 
 /** Applique la balance d'un moment. */
 function applyMoment(g: Graph, next: Moment): void {
-  const mix = MIXES[next]
+  const mix = mixFor(next, hushed)
   const now = g.ctx.currentTime
   // Après un passage forcé, rien ne traîne de la scène qu'on a quittée.
   const abruptMove = abrupt
@@ -615,6 +617,13 @@ export function enterMoment(next: Moment): void {
   if (graph) applyMoment(graph, next)
 }
 
+/** Le dossier a été refermé : silence jusqu'à la fin de la partie (voir `mixFor`). */
+export function setHushed(value: boolean): void {
+  if (hushed === value) return
+  hushed = value
+  if (graph) applyMoment(graph, moment)
+}
+
 /** Coupe les sons ponctuels en cours (passage d'une fin, rejouer). */
 export function stopSounds(): void {
   if (!graph) return
@@ -744,6 +753,7 @@ export function audioDebug() {
     time: g.ctx.currentTime,
     sinceMoment: g.ctx.currentTime - openedAt,
     moment,
+    hushed,
     danger,
     rms,
     peak,
