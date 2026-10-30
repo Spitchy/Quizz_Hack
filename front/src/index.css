@@ -1,0 +1,36 @@
+@import '@fontsource/special-elite';
+@import '@fontsource/vt323';
+@import '@fontsource/pirata-one';
+
+:root {
+  --void: #0a0a0c;
+  --text: #e8e4d8;
+  --danger: #ff2d2d;
+  --halo: #fff4d6;
+  --font-title: 'Pirata One', serif;
+  --font-sign: 'Special Elite', 'Courier Prime', monospace;
+  --font-hud: 'VT323', 'Share Tech Mono', monospace;
+
+  color-scheme: dark;
+  color: var(--text);
+  background: var(--void);
+  font-family: var(--font-hud);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--void);
+  overscroll-behavior: none;
+  user-select: none;
+}
