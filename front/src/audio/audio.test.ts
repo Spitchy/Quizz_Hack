@@ -18,12 +18,13 @@ import {
   LAYERS,
   MIXES,
   momentFor,
+  musicSpeed,
   neonBuzzGain,
   volumeGain,
   type Moment,
 } from './mix'
 import { RECIPES } from './recipes'
-import { SAMPLE_FILES } from './samples'
+import { SAMPLE_FILES, SOUNDTRACK } from './samples'
 import { DEFAULT_SETTINGS, loadSettings, saveSettings } from './settings'
 import { moodGain, moodRate, nearest, occlusionFor, VOICES, wallDepth } from './spatial'
 
@@ -83,6 +84,27 @@ describe('moments', () => {
       for (const layer of Object.keys(mix.levels)) expect(LAYERS).toContain(layer)
       for (const step of mix.timeline ?? []) expect([...LAYERS, 'muffle']).toContain(step.target)
     }
+  })
+})
+
+describe('le vieux disque', () => {
+  it('tourne dans le couloir, et jamais devant la caméra', () => {
+    expect(MIXES.corridor.levels.music).toBeGreaterThan(0)
+    for (const m of ['approach', 'beat', 'knockout', 'wake'] as const) expect(MIXES[m].levels.music ?? 0).toBe(0)
+  })
+
+  it('se tait dès la lumière de la victoire', () => {
+    for (const m of ['whiteout', 'room', 'door', 'through', 'outside'] as const) expect(MIXES[m].levels.music ?? 0).toBe(0)
+  })
+
+  it('presque muet juste avant le verdict', () => {
+    expect(MIXES.answering.levels.music!).toBeLessThan(MIXES.corridor.levels.music! * 0.2)
+  })
+
+  it('ralentit quand tout s\'effondre', () => {
+    expect(musicSpeed('freeze').rate).toBeLessThan(musicSpeed('over').rate)
+    expect(musicSpeed('over').rate).toBeLessThan(musicSpeed('corridor').rate)
+    expect(musicSpeed('freeze').rate).toBeGreaterThanOrEqual(0.25)
   })
 })
 
@@ -267,6 +289,11 @@ describe('enregistrements', () => {
       expect(line, file).toBeDefined()
       expect(line, file).toMatch(/CC0 1\.0|CC BY-NC-SA 4\.0/)
     }
+  })
+
+  it('comptent la bande-son, présente et créditée', () => {
+    expect(statSync(new URL(SOUNDTRACK, folder)).size).toBeGreaterThan(1024 * 1024)
+    expect(credits).toContain(SOUNDTRACK)
   })
 
   it('remplacent des sons du catalogue et restent légers', () => {

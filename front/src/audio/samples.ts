@@ -23,3 +23,6 @@ export const SAMPLE_FILES: Partial<Record<SoundName, readonly string[]>> = {
   'anger-crt': files('anger-crt', 2),
   'anger-cluster': files('anger-cluster', 2),
 }
+
+/** La bande-son : lue en continu par un élément audio, jamais décodée d'un bloc. */
+export const SOUNDTRACK = 'japanese-sandman-1920.mp3'

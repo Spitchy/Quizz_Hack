@@ -60,6 +60,8 @@ export type Layer =
   | 'glitchBed'
   | 'wind'
   | 'grass'
+  /** Le vieux disque et son bruit de fond. */
+  | 'music'
   /** Fondu vers le micro de caméra de surveillance. */
   | 'cctv'
   /** Fondu vers le signal écrasé (paliers numériques). */
@@ -81,6 +83,7 @@ export const LAYERS: readonly Layer[] = [
   'glitchBed',
   'wind',
   'grass',
+  'music',
   'cctv',
   'crush',
   'gate',
@@ -101,6 +104,7 @@ export const LAYER_TRIM: Record<Layer, number> = {
   glitchBed: 0.3,
   wind: 0.5,
   grass: 0.16,
+  music: 0.38,
   cctv: 1,
   crush: 1,
   gate: 1,
@@ -134,27 +138,33 @@ const OPEN_EARS = 18000
 export const MIXES: Record<Moment, MomentMix> = {
   silent: { levels: {}, fade: 0.25 },
   corridor: {
-    levels: { roomTone: 0.5, neon: 0.8, drone: 1, heartbeat: 1, monsters: 1, haze: 1 },
+    levels: { roomTone: 0.5, neon: 0.8, drone: 1, heartbeat: 1, monsters: 1, haze: 1, music: 0.6 },
     fade: 0.9,
     room: 'corridor',
   },
   reading: {
-    levels: { roomTone: 0.32, neon: 0.45, drone: 0.8, heartbeat: 1, monsters: 0.75, haze: 0.8 },
+    levels: { roomTone: 0.32, neon: 0.45, drone: 0.8, heartbeat: 1, monsters: 0.75, haze: 0.8, music: 0.42 },
     fade: 0.7,
     room: 'corridor',
   },
   answering: {
-    levels: { roomTone: 0.1, neon: 0.1, drone: 0.2, heartbeat: 0.5, monsters: 0.15 },
+    levels: { roomTone: 0.1, neon: 0.1, drone: 0.2, heartbeat: 0.5, monsters: 0.15, music: 0.06 },
     fade: 0.09,
     room: 'corridor',
   },
   reacting: {
-    levels: { roomTone: 0.4, neon: 0.6, drone: 1, heartbeat: 1, monsters: 1, haze: 1 },
+    levels: { roomTone: 0.4, neon: 0.6, drone: 1, heartbeat: 1, monsters: 1, haze: 1, music: 0.35 },
     fade: 0.5,
     room: 'corridor',
   },
   // Les néons meurent : il ne reste que le cœur, dans un quasi-silence.
-  freeze: { levels: { roomTone: 0.06, heartbeat: 1 }, fade: 0.3, room: 'corridor' },
+  freeze: {
+    levels: { roomTone: 0.06, heartbeat: 1, music: 0.5 },
+    fade: 0.2,
+    room: 'corridor',
+    // Le disque ralentit avec le courant, puis s'éteint.
+    timeline: [{ at: 0.45, target: 'music', to: 0, fade: 0.3 }],
+  },
   // Coupe sur la caméra : tout passe d'un coup par son mauvais micro.
   approach: {
     levels: { roomTone: 0.9, neon: 1, monsters: 1.3, tape: 1, cctv: 1 },
@@ -187,18 +197,20 @@ export const MIXES: Record<Moment, MomentMix> = {
     fade: 0.1,
     room: 'tiles',
     timeline: [
+      // La porte ouverte laisse entrer le disque, resté dans le couloir.
+      { at: 0.5, target: 'music', to: 0.22, fade: 0.5 },
       { at: 1.2, target: 'breath', to: 0.8, fade: 0.5 },
       { at: 3.6, target: 'breath', to: 1, fade: 0.2 },
     ],
   },
   // Le son se disloque : paliers numériques, coupures, parasites.
   infected: {
-    levels: { roomTone: 0.3, neon: 0.6, drone: 0.7, glitchBed: 0.8, crush: 0.75, gate: 0.9, drip: 0.25 },
+    levels: { roomTone: 0.3, neon: 0.6, drone: 0.7, glitchBed: 0.8, crush: 0.75, gate: 0.9, drip: 0.25, music: 0.4 },
     fade: 0.06,
     room: 'tiles',
   },
   over: {
-    levels: { roomTone: 0.25, drone: 0.4, glitchBed: 0.22, crush: 0.3, gate: 0.45 },
+    levels: { roomTone: 0.25, drone: 0.4, glitchBed: 0.22, crush: 0.3, gate: 0.45, music: 0.75 },
     fade: 0.9,
     room: 'tiles',
   },
@@ -214,6 +226,31 @@ export const MIXES: Record<Moment, MomentMix> = {
   door: { levels: { wind: 0.25 }, fade: 0.6, room: 'tiles' },
   through: { levels: { wind: 0.6, grass: 0.3 }, fade: 0.6 },
   outside: { levels: { wind: 0.85, grass: 0.9 }, fade: 1.2 },
+}
+
+/** Vitesse du disque : il traîne toujours un peu, ce qui baisse aussi sa hauteur. */
+export interface MusicSpeed {
+  rate: number
+  /** Durée de la variation (s). */
+  glide: number
+}
+
+const NORMAL_SPEED: MusicSpeed = { rate: 0.8, glide: 0.6 }
+
+/** Le disque suit la mise en scène : il s'écroule à la défaite, se traîne au GAME OVER. */
+export function musicSpeed(moment: Moment): MusicSpeed {
+  switch (moment) {
+    case 'freeze':
+      return { rate: 0.3, glide: 0.8 }
+    case 'inject':
+      return { rate: 0.72, glide: 0.1 }
+    case 'infected':
+      return { rate: 0.6, glide: 1 }
+    case 'over':
+      return { rate: 0.52, glide: 2 }
+    default:
+      return NORMAL_SPEED
+  }
 }
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v))

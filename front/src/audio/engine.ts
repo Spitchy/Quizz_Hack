@@ -10,11 +10,13 @@ import {
   LAYER_TRIM,
   LAYERS,
   MIXES,
+  musicSpeed,
   volumeGain,
   type Layer,
   type Moment,
 } from './mix'
 import type { SoundName } from './recipes'
+import { SOUNDTRACK } from './samples'
 import { loadSettings, localStore, saveSettings, type SoundSettings } from './settings'
 
 // Le moteur audio : un graphe unique, créé au clic sur [ ENTRER ] (les navigateurs
@@ -57,6 +59,8 @@ interface Graph {
   droneVoices: OscillatorNode[]
   heartLevel: GainNode
   hazeLevel: GainNode
+  /** Le vieux disque, lu en continu : jamais décodé d'un bloc. */
+  song: HTMLAudioElement
   /** Sons ponctuels en cours ou programmés : coupés nets au changement de moment. */
   active: Set<AudioBufferSourceNode>
 }
@@ -268,6 +272,42 @@ function buildGraph(ctx: AudioContext): Graph {
   const wind = loopLayer('wind', buses.ambience)
   const grass = loopLayer('grass', buses.ambience)
 
+  // --- Le vieux disque : un pavillon de gramophone, de l'usure, et un plateau qui ondule. ---
+  const music = gain(0, buses.ambience)
+  startLoop(ctx, 'old-noise', gain(0.45, music))
+  const song = new Audio(`${import.meta.env.BASE_URL}audio/${SOUNDTRACK}`)
+  song.loop = true
+  song.preload = 'auto'
+  // Pas de correction de hauteur : ralentir un disque le fait aussi descendre.
+  song.preservesPitch = false
+  song.playbackRate = musicSpeed('silent').rate
+  const horn = ctx.createBiquadFilter()
+  horn.type = 'highpass'
+  horn.frequency.value = 280
+  horn.Q.value = 1
+  const mouth = ctx.createBiquadFilter()
+  mouth.type = 'lowpass'
+  mouth.frequency.value = 2800
+  mouth.Q.value = 1.2
+  const worn = ctx.createWaveShaper()
+  worn.curve = micCurve(1.4)
+  const warble = ctx.createDelay(0.05)
+  warble.delayTime.value = 0.014
+  const warbleDepth = gain(0.0022)
+  const warbleRate = ctx.createOscillator()
+  warbleRate.frequency.value = 0.55
+  warbleRate.connect(warbleDepth)
+  warbleDepth.connect(warble.delayTime)
+  warbleRate.start()
+  ctx.createMediaElementSource(song).connect(horn)
+  horn.connect(mouth)
+  mouth.connect(worn)
+  worn.connect(warble)
+  warble.connect(music)
+  void song.play().catch(() => {
+    // Lecture refusée : le jeu continue sans la musique.
+  })
+
   // --- Drone : trois oscillateurs qui se désaccordent avec le danger. ---
   const droneFilter = ctx.createBiquadFilter()
   droneFilter.type = 'lowpass'
@@ -315,6 +355,7 @@ function buildGraph(ctx: AudioContext): Graph {
     glitchBed: glitchBed.gain,
     wind: wind.gain,
     grass: grass.gain,
+    music: music.gain,
     cctv: cctvWet.gain,
     crush: crushWet.gain,
     gate: gateDepth.gain,
@@ -342,8 +383,28 @@ function buildGraph(ctx: AudioContext): Graph {
     droneVoices,
     heartLevel,
     hazeLevel,
+    song,
     active: new Set(),
   }
+}
+
+let speedTimer = 0
+
+/** Fait glisser la vitesse du disque : un élément audio n'a pas de rampe automatique. */
+function glideMusic(g: Graph, next: Moment, immediately: boolean): void {
+  window.clearInterval(speedTimer)
+  const { rate, glide: seconds } = musicSpeed(next)
+  if (immediately || seconds <= 0) {
+    g.song.playbackRate = rate
+    return
+  }
+  const from = g.song.playbackRate
+  const startedAt = performance.now()
+  speedTimer = window.setInterval(() => {
+    const k = Math.min(1, (performance.now() - startedAt) / (seconds * 1000))
+    g.song.playbackRate = from + (rate - from) * k
+    if (k >= 1) window.clearInterval(speedTimer)
+  }, 50)
 }
 
 /** Applique la balance d'un moment. */
@@ -351,6 +412,7 @@ function applyMoment(g: Graph, next: Moment): void {
   const mix = MIXES[next]
   const now = g.ctx.currentTime
   // Après un passage forcé, rien ne traîne de la scène qu'on a quittée.
+  const abruptMove = abrupt
   const fade = abrupt ? Math.min(mix.fade, 0.04) : mix.fade
   abrupt = false
 
@@ -371,6 +433,8 @@ function applyMoment(g: Graph, next: Moment): void {
 
   if (mix.muffle) glide(g.muffle.frequency, mix.muffle, 0, now)
   else if (!mix.timeline?.some((a) => a.target === 'muffle')) glide(g.muffle.frequency, 18000, mix.cut ? 0 : Math.max(fade, 0.05), now)
+
+  glideMusic(g, next, abruptMove)
 
   // Réverbération de la pièce où l'on est.
   const sends = { corridor: mix.room === 'corridor' ? 0.2 : 0, tiles: mix.room === 'tiles' ? 0.28 : 0 }
@@ -440,11 +504,17 @@ export function unlockAudio(): void {
       window.setInterval(() => scheduleHeartbeat(g), 80)
       // Onglet caché : le temps audio s'arrête avec le rendu.
       document.addEventListener('visibilitychange', () => {
-        if (document.hidden) void ctx.suspend()
-        else void ctx.resume()
+        if (document.hidden) {
+          void ctx.suspend()
+          g.song.pause()
+        } else {
+          void ctx.resume()
+          void g.song.play().catch(() => {})
+        }
       })
     }
     void graph.ctx.resume()
+    void graph.song.play().catch(() => {})
   } catch {
     // Pas d'audio dans ce navigateur : le jeu se joue en silence.
     graph = null
@@ -600,6 +670,7 @@ export function audioDebug() {
     scene: g.scene.gain.value,
     user: g.user.gain.value,
     muffle: g.muffle.frequency.value,
+    song: { paused: g.song.paused, time: g.song.currentTime, rate: g.song.playbackRate, ready: g.song.readyState, error: g.song.error?.code ?? null },
     layers,
     bank: bankStatus(),
     history: history.slice(),

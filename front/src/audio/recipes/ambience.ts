@@ -154,6 +154,22 @@ export function gateCurve(rate: number, random: Random): Samples {
   return out
 }
 
+/** Le disque usé : souffle blanc, craquements, et le léger grondement du plateau. */
+export function oldNoise(rate: number, random: Random): Samples {
+  const seconds = 7
+  const overlap = 0.5
+  const out = alloc(seconds + overlap, rate)
+  const hiss = new Biquad('bandpass', 3200, 0.45, rate)
+  const rumble = new Biquad('lowpass', 70, 0.8, rate)
+  const pop = new Biquad('bandpass', 2400, 1.3, rate)
+  for (let i = 0; i < out.length; i++) {
+    const white = random() * 2 - 1
+    const click = random() < 0.0009 ? (random() * 2 - 1) * (2 + random() * 9) : 0
+    out[i] = hiss.tick(white) * 0.9 + rumble.tick(random() * 2 - 1) * 1.6 + pop.tick(click)
+  }
+  return normalize(loopable(out, overlap, rate), 0.8)
+}
+
 /** Le vent dehors : bruit rose, rafales lentes qui balaient le filtre. */
 export function wind(rate: number, random: Random): Samples {
   const seconds = 14
