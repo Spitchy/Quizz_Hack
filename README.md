@@ -68,7 +68,7 @@ VITE_MAZE_LAYOUT=corridor
 VITE_SHOW_ANSWERS=true
 ```
 
-Puis `npm run dev` dans `front/`, http://localhost:5173 et **[ ENTRER ]** : faux serveur intégré, entités alignées dans un couloir droit, bonnes réponses cochées.
+Puis `npm run dev` dans `front/`, http://localhost:5173 et **[ ENTRER ]** : faux serveur intégré, entités alignées dans un couloir droit, bonnes réponses cochées. À la première entrée dans un onglet, l'intro passe d'abord : `[ESPACE]` pour la passer.
 
 | Variable (`front/.env.local`) | Effet |
 | --- | --- |
