@@ -446,10 +446,13 @@ export function tileAt(x: number, z: number): Tile {
 /** Distance entre l'entité et le joueur quand il lit son panneau. */
 export const READING_DISTANCE = 2.0
 
-/** Position de l'entité (adossée au fond de sa tuile) et point de lecture devant elle. */
-export function entityPlacement(spot: EntitySpot) {
+/**
+ * Position de l'entité (adossée au fond de sa tuile) et point de lecture devant
+ * elle. `clearance` : distance au mur du fond (m) ; les grands gestes en demandent plus.
+ */
+export function entityPlacement(spot: EntitySpot, clearance = 0.45) {
   const center = tileCenter(spot)
-  const back = TILE_SIZE / 2 - 0.45
+  const back = TILE_SIZE / 2 - clearance
   const position = { x: center.x - spot.facing.dx * back, z: center.z - spot.facing.dy * back }
   const reading = {
     x: position.x + spot.facing.dx * READING_DISTANCE,

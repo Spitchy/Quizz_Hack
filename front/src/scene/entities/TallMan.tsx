@@ -55,10 +55,14 @@ export function TallMan({ look, motion, mats, sign }: ArchetypeProps) {
     torso.current.rotation.set(0.05 + anger * 0.18 + strike * 0.35 + Math.min(0, m.attack) * 0.12, 0, Math.sin(t * 0.7) * 0.03 * (1 - anger))
     if (pelvis.current) pelvis.current.position.y = Math.abs(Math.sin(m.walkPhase)) * 0.05 * m.walk
 
-    // Cou qui s'étire, tête qui se tord par saccades (rapides, mais jamais d'une image à l'autre).
-    const stretch = 1 + anger * (1.2 + 1.2 * m.fresh)
+    // Cou qui s'étire vers le joueur (il touche déjà le plafond), tête qui se tord
+    // par saccades (rapides, mais jamais d'une image à l'autre).
+    const stretch = 1 + anger * (0.9 + 0.9 * m.fresh)
+    const reach = anger * (0.7 + 0.5 * m.fresh)
     neck.current.scale.y = stretch
-    head.current.position.y = NECK_BASE + 0.22 * stretch + 0.13
+    neck.current.rotation.x = reach
+    head.current.position.y = NECK_BASE + Math.cos(reach) * 0.22 * stretch + 0.13
+    head.current.position.z = 0.08 + Math.sin(reach) * 0.22 * stretch
     const snap = twitch(t * 6, 3, 0.4) * 1.4 * anger
     head.current.rotation.set(Math.sin(t * 0.4) * 0.04, m.lookYaw, snap + m.menace * 0.35)
 

@@ -58,6 +58,19 @@ const PALETTES: Record<Archetype, readonly Palette[]> = {
   ],
 }
 
+/**
+ * Distance au mur du fond (m) : ce que chaque monstre occupe derrière lui, gestes
+ * de colère compris (cambré, cabré, gonflé). Sans elle, il entre dans le mur.
+ */
+export const WALL_CLEARANCE: Record<Archetype, number> = {
+  tall: 0.55,
+  mannequin: 0.75,
+  crawler: 1.05,
+  child: 0.55,
+  crt: 0.7,
+  cluster: 0.8,
+}
+
 /** Hauteur du centre du panneau tenu par chaque monstre (m). */
 export const SIGN_HEIGHT: Record<Archetype, number> = {
   tall: 1.42,
@@ -89,7 +102,8 @@ export function entityLook(seed: number, id: number): EntityLook {
     archetype,
     palette: pick(random, PALETTES[archetype]),
     phase: random() * Math.PI * 2,
-    scale: 0.94 + random() * 0.12,
+    // Le Long touche déjà le plafond (2,70 m) : il ne grandit jamais au-delà de sa taille.
+    scale: archetype === 'tall' ? 0.94 + random() * 0.06 : 0.94 + random() * 0.12,
     watches: random() < 0.6,
   }
 }

@@ -11,7 +11,7 @@ import { entityPlacement, tileCenter, type Maze } from '../maze/generate'
 import type { Circle } from '../maze/physics'
 import type { RadioSpot } from '../maze/radioSpot'
 import { Effects } from './Effects'
-import { entityLook, SIGN_HEIGHT, type EntityLook } from './entities/archetypes'
+import { entityLook, SIGN_HEIGHT, WALL_CLEARANCE, type EntityLook } from './entities/archetypes'
 import { Entity, type DefeatRole, type Reaction } from './Entity'
 import { EYE_HEIGHT, PALETTE } from './layout'
 import { MazeWorld } from './MazeWorld'
@@ -174,7 +174,7 @@ function MazeContents(props: MazeSceneProps) {
     () =>
       maze.entities.map((spot) => {
         const look = entityLook(maze.seed, spot.id)
-        return { id: spot.id, look, signY: SIGN_HEIGHT[look.archetype] * look.scale, ...entityPlacement(spot) }
+        return { id: spot.id, look, signY: SIGN_HEIGHT[look.archetype] * look.scale, ...entityPlacement(spot, WALL_CLEARANCE[look.archetype]) }
       }),
     [maze],
   )
