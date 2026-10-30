@@ -63,19 +63,42 @@ export interface Hit {
   at: number
 }
 
+/** Écart entre deux arrivées (s) : elles se jettent sur lui l'une après l'autre. */
+const ARRIVAL_SPACING = 0.5
+/** La dernière arrive au plus tard à ce moment du passage à tabac. */
+const LAST_ARRIVAL = 2.6
+/** Du dernier coup au noir (s) : la coupure tombe en plein passage à tabac. */
+const CUT_AFTER_LAST_HIT = 0.35
+
+/** Instant où l'assaillant de rang `rank` (la plus proche d'abord) arrive, depuis le début du passage à tabac. */
+export function arrivalAt(rank: number): number {
+  return Math.min(LAST_ARRIVAL, rank * ARRIVAL_SPACING)
+}
+
+/** Variation de rythme, reproductible : elles ne frappent pas comme un métronome. */
+function jitter(n: number): number {
+  const s = Math.sin(n * 91.73 + 4.1) * 43758.5453
+  return s - Math.floor(s)
+}
+
 /**
- * Coups portés pendant le passage à tabac : chacun son tour, de plus en plus
- * vite. Les derniers tombent sur lui à terre ; puis plus rien, il gît dans son
- * sang le temps que la caméra le montre, avant le noir.
+ * Coups du passage à tabac. Chacune frappe dès son arrivée et ne s'arrête plus,
+ * à son propre rythme, jusqu'à la coupure : personne n'attend son tour en le
+ * regardant. Le rythme s'adapte au nombre d'assaillants, pour rester lisible.
  */
 export function beatSchedule(attackers: number, duration = BEAT_SECONDS): Hit[] {
   if (attackers <= 0) return []
-  const count = Math.min(12, Math.max(5, attackers * 2 + 2))
-  const last = duration - 1.4
-  return Array.from({ length: count }, (_, i) => ({
-    attacker: i % attackers,
-    at: 0.7 + (last - 0.7) * (i / (count - 1)) ** 0.8,
-  }))
+  const end = duration - CUT_AFTER_LAST_HIT
+  const interval = Math.max(0.72, attackers * 0.24)
+  const hits: Hit[] = []
+  for (let attacker = 0; attacker < attackers; attacker++) {
+    let at = arrivalAt(attacker) + 0.08
+    for (let n = 0; at <= end; n++) {
+      hits.push({ attacker, at })
+      at += interval * (0.86 + 0.28 * jitter(attacker * 13 + n))
+    }
+  }
+  return hits.sort((a, b) => a.at - b.at)
 }
 
 /**

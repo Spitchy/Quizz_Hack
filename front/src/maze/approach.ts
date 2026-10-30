@@ -1,5 +1,5 @@
 import { bfs, DIRS, isFloor, tileAt, tileCenter, tileIndex, type Maze, type Tile } from './generate'
-import type { Vec2 } from './physics'
+import type { Circle, Vec2 } from './physics'
 
 // Défaite : les entités qu'on a fâchées reviennent vers le joueur en suivant
 // les couloirs, depuis la direction où il les a laissées. Pur, testable.
@@ -8,13 +8,13 @@ export interface ApproachPlan {
   entity: number
   /** Trajet en coordonnées monde, du point de départ (dans le noir) au joueur. */
   path: Vec2[]
-  /** Départ décalé (s) : elles n'arrivent pas toutes en même temps. */
-  delay: number
 }
 
 export interface ApproachOptions {
   /** Longueur maximale du trajet visible, en tuiles. */
   maxTiles?: number
+  /** Un meuble : personne ne prend place dessus. */
+  avoid?: Circle | null
 }
 
 /** Chemin de tuiles de `from` jusqu'au joueur, en descendant les distances BFS. */
@@ -134,7 +134,7 @@ export function planApproach(
   maze: Maze,
   player: Vec2,
   attackers: readonly { entity: number; from: Vec2 }[],
-  { maxTiles = 7 }: ApproachOptions = {},
+  { maxTiles = 7, avoid = null }: ApproachOptions = {},
 ): ApproachResult {
   const playerTile = tileAt(player.x, player.z)
   const dist = bfs(maze, playerTile)
@@ -198,7 +198,9 @@ export function planApproach(
   const slots = RING.map(([angle, radius]) => {
     const a = base + angle
     return { angle: a, radius, p: { x: stand.x + Math.sin(a) * radius, z: stand.z + Math.cos(a) * radius } }
-  }).filter((slot) => angleDiff(slot.angle, cameraAngle) > CAMERA_CLEARANCE && roomy(maze, slot.p) && clearLine(maze, slot.p, stand))
+  })
+    .filter((slot) => angleDiff(slot.angle, cameraAngle) > CAMERA_CLEARANCE && roomy(maze, slot.p) && clearLine(maze, slot.p, stand))
+    .filter((slot) => !avoid || Math.hypot(slot.p.x - avoid.x, slot.p.z - avoid.z) > avoid.radius + BODY_MARGIN + 0.2)
   const taken = new Set<number>()
   const order = routes.map((_, k) => k).sort((i, j) => pathLength(routes[i].path) - pathLength(routes[j].path))
   const ends: Vec2[] = new Array(attackers.length)
@@ -241,7 +243,7 @@ export function planApproach(
       }
     }
     path.push(end)
-    return { entity, path, delay: k * 0.4 }
+    return { entity, path }
   })
   return { plans, facing, stand, camera }
 }

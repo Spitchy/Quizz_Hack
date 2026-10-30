@@ -137,9 +137,11 @@ export function PlayerBody({ stage, stand, yaw, hits, probe }: PlayerBodyProps) 
         local.set(stand.x - hit.from.x, 0, stand.z - hit.from.z).normalize()
         const lx = local.x * Math.cos(yaw) - local.z * Math.sin(yaw)
         const lz = local.x * Math.sin(yaw) + local.z * Math.cos(yaw)
-        s.pitch.velocity += lz * 9
-        s.roll.velocity += -lx * 9
-        s.twist.velocity += (s.taken % 2 ? 1 : -1) * 6
+        // Les coups s'enchaînent : chacun pousse moins, pour que le corps reste lisible.
+        const force = Math.min(1, 12 / hits.length)
+        s.pitch.velocity += lz * 9 * force
+        s.roll.velocity += -lx * 9 * force
+        s.twist.velocity += (s.taken % 2 ? 1 : -1) * 6 * force
         playBeatingHit(s.taken, hits.length, stand.x, stand.z)
         s.taken++
       }

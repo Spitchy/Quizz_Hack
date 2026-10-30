@@ -2,10 +2,10 @@ import { Canvas, useFrame } from '@react-three/fiber'
 import { memo, useMemo, useRef } from 'react'
 import { Color, type FogExp2, type HemisphereLight } from 'three'
 import type { Question } from '../api/client'
-import { beatSchedule, CCTV_STAGES, type DefeatStage, type VictoryStage } from '../app/sequence'
+import { arrivalAt, beatSchedule, CCTV_STAGES, type DefeatStage, type VictoryStage } from '../app/sequence'
 import { toEntityState, toWorldState, upsetEntities, type EntityMood } from '../game/render'
 import type { GameSnapshot } from '../game/types'
-import { planApproach } from '../maze/approach'
+import { pathLength, planApproach } from '../maze/approach'
 import type { ExitRoom } from '../maze/exitRoom'
 import { entityPlacement, tileCenter, type Maze } from '../maze/generate'
 import type { Circle } from '../maze/physics'
@@ -191,12 +191,20 @@ function MazeContents(props: MazeSceneProps) {
     const engaged = snapshot.engagedEntity
     const player = engaged !== null ? placements[engaged].reading : tileCenter(maze.spawn)
     const attackers = upset.map((id) => ({ entity: id, from: placements[id].position }))
-    const { plans, facing, stand, camera } = planApproach(maze, player, attackers)
+    const { plans, facing, stand, camera } = planApproach(maze, player, attackers, { avoid: radio?.obstacle })
     const hits = beatSchedule(upset.length)
+    // La plus proche arrive la première : le rang remplace l'ordre des erreurs.
+    const byRank = plans.map((plan) => plan).sort((a, b) => pathLength(a.path) - pathLength(b.path))
+    const fallAt = hits[Math.floor(hits.length * 0.72)]?.at ?? 0
     return {
-      plans: new Map(plans.map((plan, i) => [plan.entity, { plan, hits: hits.filter((h) => h.attacker === i).map((h) => h.at) }])),
+      plans: new Map(
+        byRank.map((plan, rank) => [
+          plan.entity,
+          { plan, hits: hits.filter((h) => h.attacker === rank).map((h) => h.at), arrival: arrivalAt(rank), fallAt },
+        ]),
+      ),
       // Chaque coup, et d'où il vient (la place de l'assaillant) : le corps recule à l'opposé.
-      bodyHits: hits.map((h) => ({ at: h.at, from: plans[h.attacker].path[plans[h.attacker].path.length - 1] })),
+      bodyHits: hits.map((h) => ({ at: h.at, from: byRank[h.attacker].path[byRank[h.attacker].path.length - 1] })),
       // Le regard du joueur se tourne vers elles ; son corps leur fait face.
       faceYaw: Math.atan2(-facing.x, -facing.z),
       bodyYaw: Math.atan2(facing.x, facing.z),
@@ -204,7 +212,7 @@ function MazeContents(props: MazeSceneProps) {
       camera,
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [maze, placements, upsetKey, snapshot.engagedEntity])
+  }, [maze, radio, placements, upsetKey, snapshot.engagedEntity])
 
   const filmed = defeatStage !== null && CCTV_STAGES.includes(defeatStage)
   const probe = useRef(createProbe())
@@ -217,7 +225,7 @@ function MazeContents(props: MazeSceneProps) {
   const defeatRoles = useMemo(() => {
     const out = new Map<number, DefeatRole>()
     if (!defeatStage) return out
-    for (const [id, role] of roles.plans) out.set(id, { stage: defeatStage, plan: role.plan, hits: role.hits, target: roles.stand })
+    for (const [id, role] of roles.plans) out.set(id, { stage: defeatStage, ...role, target: roles.stand })
     return out
   }, [roles, defeatStage])
 
