@@ -48,6 +48,48 @@ export function clearSessionId(store: KeyValueStore | null): void {
   }
 }
 
+const SCARE_KEY = 'quizzhack.scaredSession'
+const INTRO_KEY = 'quizzhack.introSeen'
+
+/** La session où le dossier a déjà été refermé : une partie reprise ne rejoue pas la scène. */
+export function loadScaredSession(store: KeyValueStore | null): string | null {
+  try {
+    return store?.getItem(SCARE_KEY) || null
+  } catch {
+    return null
+  }
+}
+
+export function saveScaredSession(store: KeyValueStore | null, sessionId: string): void {
+  try {
+    store?.setItem(SCARE_KEY, sessionId)
+  } catch {
+    // Sans mémoire : la scène reviendrait seulement après un rechargement.
+  }
+}
+
+/** L'intro passe une fois par onglet, à la première vraie entrée. */
+export function introSeen(store: KeyValueStore | null): boolean {
+  try {
+    return store?.getItem(INTRO_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+export function markIntroSeen(store: KeyValueStore | null): void {
+  try {
+    store?.setItem(INTRO_KEY, '1')
+  } catch {
+    // idem
+  }
+}
+
+/** Faut-il montrer l'intro ? Pas si une session est à reprendre, ni si elle a déjà été vue. */
+export function wantsIntro(store: KeyValueStore | null): boolean {
+  return !loadSessionId(store) && !introSeen(store)
+}
+
 export interface Launch {
   token: string | null
   /** URL sans le jeton, à remettre dans la barre d'adresse (`null` si inchangée). */

@@ -8,9 +8,12 @@ import {
   Object3D,
   type InstancedMesh,
 } from 'three'
+import type { ScareStage } from '../app/sequence'
+import { playAt } from '../audio/stage'
 import { TILE_SIZE, ZONES, type Maze } from '../maze/generate'
 import { buildWallMeshes, type MeshData } from '../maze/mesh'
 import { neonIntensity } from './flicker'
+import { lampDeaths, scareLampLevel } from './scareMotion'
 import { CORRIDOR_HEIGHT, PALETTE } from './layout'
 import { carpetTexture, ceilingTexture, lightPoolTexture, wallpaperTexture } from './textures'
 
@@ -32,6 +35,8 @@ const PANEL_COLOR = new Color(PALETTE.halo).multiplyScalar(0.95)
 const POOL_COLOR = new Color(PALETTE.halo).multiplyScalar(0.16)
 const scratch = new Object3D()
 const color = new Color()
+/** Assez près pour entendre sauter le disjoncteur de la lampe (m). */
+const BREAKER_RANGE = 15
 
 interface MazeWorldProps {
   maze: Maze
@@ -40,9 +45,11 @@ interface MazeWorldProps {
   dark: boolean
   /** Victoire : 0..1, les néons s'allument à pleine puissance et cessent de grésiller. */
   surge?: number
+  /** Dossier refermé : les lampes meurent l'une après l'autre jusqu'au joueur. */
+  scare?: ScareStage | null
 }
 
-export function MazeWorld({ maze, danger, dark, surge = 0 }: MazeWorldProps) {
+export function MazeWorld({ maze, danger, dark, surge = 0, scare = null }: MazeWorldProps) {
   const geometries = useMemo(() => {
     const { walls, baseboards } = buildWallMeshes(maze, CORRIDOR_HEIGHT)
     return { walls: walls.map(toGeometry), baseboards: toGeometry(baseboards) }
@@ -102,10 +109,36 @@ export function MazeWorld({ maze, danger, dark, surge = 0 }: MazeWorldProps) {
     }
   }, [maze])
 
-  useFrame(({ clock }) => {
+  const blackout = useRef({ stage: null as ScareStage | null, at: 0, deaths: [] as number[], out: new Set<number>() })
+
+  useFrame(({ clock, camera }) => {
     const t = clock.elapsedTime
+    const b = blackout.current
+    const lampX = (i: number) => (maze.lights[i].x + 0.5) * TILE_SIZE
+    const lampZ = (i: number) => (maze.lights[i].y + 0.5) * TILE_SIZE
+    const away = (i: number) => Math.hypot(lampX(i) - camera.position.x, lampZ(i) - camera.position.z)
+    if (b.stage !== scare) {
+      b.stage = scare
+      b.at = t
+      // Il peut encore marcher : l'ordre est fixé là où il se trouve à cet instant.
+      if (scare === 'dim') {
+        b.deaths = lampDeaths(maze.lights.map((_, i) => away(i)))
+        b.out.clear()
+      }
+    }
+    const since = t - b.at
     maze.lights.forEach((light, i) => {
-      const k = neonIntensity(light, i, t, danger, dark, surge)
+      let k = neonIntensity(light, i, t, danger, dark, surge)
+      if (scare) {
+        const distance = away(i)
+        const death = b.deaths[i] ?? 0
+        k *= scareLampLevel(scare, since, death, distance, i)
+        if (scare === 'dim' && !b.out.has(i) && since >= death) {
+          b.out.add(i)
+          // Le disjoncteur saute, dans le plafond, à chaque lampe qui lâche près de lui.
+          if (distance < BREAKER_RANGE) playAt('breaker', [lampX(i), CORRIDOR_HEIGHT, lampZ(i)], { gain: 0.9 })
+        }
+      }
       panels.current?.setColorAt(i, color.copy(PANEL_COLOR).multiplyScalar(k))
       pools.current?.setColorAt(i, color.copy(POOL_COLOR).multiplyScalar(k))
     })

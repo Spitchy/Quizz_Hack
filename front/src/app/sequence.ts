@@ -49,6 +49,55 @@ export const DOOR_TIMELINE: Timeline<VictoryStage> = [
   ['screen', 3100],
 ]
 
+/**
+ * Intro, à la toute première entrée : le bulletin plein écran, un seul
+ * mouvement de recul jusqu'au téléphone dans ses mains, le téléphone dans la
+ * poche, le regard vers la pluie. La camionnette noire arrive, la porte glisse,
+ * il court, le coup de batte part, noir, le jeu commence.
+ */
+export type IntroStage = 'news' | 'pull' | 'watch' | 'pocket' | 'look' | 'van' | 'door' | 'run' | 'swing' | 'black' | 'done'
+export const INTRO_TIMELINE: Timeline<IntroStage> = [
+  ['news', 0],
+  ['pull', 11000],
+  ['watch', 14500],
+  ['pocket', 21400],
+  ['look', 23400],
+  ['van', 27000],
+  ['door', 30600],
+  ['run', 32400],
+  ['swing', 35600],
+  ['black', 36200],
+  ['done', 39000],
+]
+
+/**
+ * Le dossier refermé, une seule fois par partie. Le joueur garde la main pendant
+ * que les lampes meurent une à une (`dim`). Noir total : tout est écrit. Il allume
+ * sa lampe, regarde à droite, à gauche, et le faisceau trouve le médecin droit
+ * devant (`torch`), qui lui saute dessus (`jump`). Le coup de pied le repousse et
+ * lui fait lâcher la lampe (`kick`, `drop`) ; il la ramasse (`pick`), braque le
+ * couloir : personne (`search`). La lumière revient. Purement visuel : aucun appel
+ * au serveur.
+ */
+export type ScareStage = 'dim' | 'dark' | 'torch' | 'jump' | 'kick' | 'drop' | 'pick' | 'search' | 'restore' | 'done'
+export const SCARE_TIMELINE: Timeline<ScareStage> = [
+  ['dim', 0],
+  ['dark', 8000],
+  ['torch', 9200],
+  ['jump', 14400],
+  ['kick', 16000],
+  ['drop', 16900],
+  ['pick', 18700],
+  ['search', 19900],
+  ['restore', 22700],
+  ['done', 24500],
+]
+
+/** Début d'une étape (s) depuis le début de la séquence. */
+export function stageStart<S extends string>(timeline: Timeline<S>, stage: S): number {
+  return (timeline.find(([s]) => s === stage)?.[1] ?? 0) / 1000
+}
+
 /** Étape en cours `elapsed` ms après le début de la séquence. */
 export function stageAt<S extends string>(timeline: Timeline<S>, elapsed: number): S {
   let current = timeline[0][0]

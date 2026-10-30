@@ -14,7 +14,19 @@ import {
   stageAt,
   VICTORY_TIMELINE,
 } from './sequence'
-import { clearSessionId, enterGame, loadSessionId, readLaunch, saveSessionId, type KeyValueStore } from './session'
+import {
+  clearSessionId,
+  enterGame,
+  introSeen,
+  loadScaredSession,
+  loadSessionId,
+  markIntroSeen,
+  readLaunch,
+  saveScaredSession,
+  saveSessionId,
+  wantsIntro,
+  type KeyValueStore,
+} from './session'
 
 function memoryStore(): KeyValueStore {
   const data = new Map<string, string>()
@@ -70,6 +82,43 @@ describe('mémorisation de session', () => {
       expect(() => saveSessionId(store, 's')).not.toThrow()
       expect(loadSessionId(store)).toBeNull()
       expect(() => clearSessionId(store)).not.toThrow()
+    }
+  })
+})
+
+describe('première entrée et scène du dossier', () => {
+  it('montre l\u2019intro à une vraie première entrée, une seule fois', () => {
+    const store = memoryStore()
+    expect(wantsIntro(store)).toBe(true)
+    markIntroSeen(store)
+    expect(introSeen(store)).toBe(true)
+    expect(wantsIntro(store)).toBe(false)
+  })
+
+  it('ne montre pas l\u2019intro quand il y a une session à reprendre', () => {
+    const store = memoryStore()
+    saveSessionId(store, 'session')
+    expect(wantsIntro(store)).toBe(false)
+  })
+
+  it('se souvient de la session où le dossier a été refermé, et d\u2019elle seule', () => {
+    const store = memoryStore()
+    expect(loadScaredSession(store)).toBeNull()
+    saveScaredSession(store, 'partie-1')
+    expect(loadScaredSession(store)).toBe('partie-1')
+    saveScaredSession(store, 'partie-2')
+    expect(loadScaredSession(store)).toBe('partie-2')
+  })
+
+  it('ne casse rien sans stockage', () => {
+    for (const store of [null, brokenStore]) {
+      expect(wantsIntro(store)).toBe(true)
+      expect(introSeen(store)).toBe(false)
+      expect(loadScaredSession(store)).toBeNull()
+      expect(() => {
+        markIntroSeen(store)
+        saveScaredSession(store, 'x')
+      }).not.toThrow()
     }
   })
 })

@@ -1,4 +1,4 @@
-import type { DefeatStage, VictoryStage } from '../app/sequence'
+import type { DefeatStage, IntroStage, ScareStage, VictoryStage } from '../app/sequence'
 import type { Phase } from '../game/types'
 
 // Mixage, en fonctions pures : quel « moment » du jeu on vit, quel niveau pour
@@ -27,10 +27,61 @@ export type Moment =
   | 'door'
   | 'through'
   | 'outside'
+  // L'intro, une balance par étape.
+  | 'introNews'
+  | 'introPull'
+  | 'introWatch'
+  | 'introPocket'
+  | 'introLook'
+  | 'introVan'
+  | 'introDoor'
+  | 'introRun'
+  | 'introSwing'
+  | 'introBlack'
+  // Le dossier refermé : les lumières meurent, le médecin surgit.
+  | 'scareDim'
+  | 'scareDark'
+  | 'scareTorch'
+  | 'scareJump'
+  | 'scareKick'
+  | 'scareDrop'
+  | 'scarePick'
+  | 'scareSearch'
+  | 'scareRestore'
 
-export function momentFor(phase: Phase, defeat: DefeatStage | null, victory: VictoryStage | null): Moment {
+const INTRO_MOMENTS: Record<Exclude<IntroStage, 'done'>, Moment> = {
+  news: 'introNews',
+  pull: 'introPull',
+  watch: 'introWatch',
+  pocket: 'introPocket',
+  look: 'introLook',
+  van: 'introVan',
+  door: 'introDoor',
+  run: 'introRun',
+  swing: 'introSwing',
+  black: 'introBlack',
+}
+
+export function introMoment(stage: IntroStage): Moment {
+  return stage === 'done' ? 'silent' : INTRO_MOMENTS[stage]
+}
+
+const SCARE_MOMENTS: Record<Exclude<ScareStage, 'done'>, Moment> = {
+  dim: 'scareDim',
+  dark: 'scareDark',
+  torch: 'scareTorch',
+  jump: 'scareJump',
+  kick: 'scareKick',
+  drop: 'scareDrop',
+  pick: 'scarePick',
+  search: 'scareSearch',
+  restore: 'scareRestore',
+}
+
+export function momentFor(phase: Phase, defeat: DefeatStage | null, victory: VictoryStage | null, scare: ScareStage | null = null): Moment {
   if (defeat) return defeat
   if (victory) return victory === 'screen' ? 'outside' : victory
+  if (scare && scare !== 'done') return SCARE_MOMENTS[scare]
   switch (phase) {
     case 'exploring':
       return 'corridor'
@@ -70,8 +121,20 @@ export type Layer =
   | 'crush'
   /** Profondeur des coupures numériques. */
   | 'gate'
+  /** La pluie de la rue, dans l'intro. */
+  | 'rain'
+  /** La camionnette au ralenti. */
+  | 'van'
+  /** Le bulletin plein écran, dans la tête. */
+  | 'tv'
+  /** Le même bulletin, sorti du haut-parleur minuscule du téléphone. */
+  | 'tvSmall'
 
 export const LAYERS: readonly Layer[] = [
+  'rain',
+  'van',
+  'tv',
+  'tvSmall',
   'roomTone',
   'neon',
   'drone',
@@ -112,6 +175,10 @@ export const LAYER_TRIM: Record<Layer, number> = {
   cctv: 1,
   crush: 1,
   gate: 1,
+  rain: 0.42,
+  van: 0.55,
+  tv: 0.85,
+  tvSmall: 1.15,
 }
 
 /** Une consigne différée à l'intérieur d'un moment. */
@@ -230,6 +297,95 @@ export const MIXES: Record<Moment, MomentMix> = {
   door: { levels: { wind: 0.25 }, fade: 0.6, room: 'tiles' },
   through: { levels: { wind: 0.6, grass: 0.3 }, fade: 0.6 },
   outside: { levels: { wind: 0.85, grass: 0.9 }, fade: 1.2 },
+
+  // --- Intro ---
+  // Plein écran : le bulletin occupe tout, la pluie est à peine là.
+  introNews: { levels: { tv: 1, rain: 0.05 }, fade: 0.05 },
+  // Le recul : le son rentre dans le haut-parleur, la rue s'ouvre autour.
+  introPull: {
+    levels: { tv: 1, rain: 0.05 },
+    fade: 0.05,
+    timeline: [
+      { at: 0.2, target: 'tv', to: 0, fade: 1 },
+      { at: 0.2, target: 'tvSmall', to: 1, fade: 0.9 },
+      { at: 0.2, target: 'rain', to: 0.85, fade: 1.2 },
+    ],
+  },
+  introWatch: { levels: { tvSmall: 1, rain: 0.9 }, fade: 0.1 },
+  // Écran verrouillé : la voix s'arrête net, il ne reste que la pluie.
+  introPocket: { levels: { rain: 1 }, fade: 0.03 },
+  introLook: { levels: { rain: 1, breath: 0.3 }, fade: 0.4 },
+  introVan: {
+    levels: { rain: 1, breath: 0.45 },
+    fade: 0.3,
+    timeline: [{ at: 0.2, target: 'van', to: 1, fade: 1.3 }],
+  },
+  introDoor: { levels: { rain: 0.85, van: 1, breath: 0.9, heartbeat: 1 }, fade: 0.2 },
+  // Il court : la camionnette reste derrière lui.
+  introRun: {
+    levels: { rain: 0.8, van: 0.6, breath: 1.3, heartbeat: 1 },
+    fade: 0.3,
+    timeline: [{ at: 0.4, target: 'van', to: 0.22, fade: 1.1 }],
+  },
+  introSwing: { levels: { rain: 0.45, van: 0.12, breath: 0.4, heartbeat: 1 }, fade: 0.08 },
+  // Le coup : plus rien que le sifflement ; la porte qui claque, de très loin.
+  introBlack: {
+    levels: { tinnitus: 1, rain: 0.2, van: 0.22 },
+    fade: 0.01,
+    muffle: 340,
+    timeline: [
+      { at: 1.1, target: 'van', to: 0, fade: 0.5 },
+      { at: 1.5, target: 'rain', to: 0, fade: 0.4 },
+      { at: 1.6, target: 'tinnitus', to: 0, fade: 0.6 },
+    ],
+  },
+
+  // --- Le dossier refermé ---
+  // Le courant lâche : le disque s'effondre avec les lampes, jusqu'au silence.
+  scareDim: {
+    levels: { roomTone: 0.32, neon: 0.45, heartbeat: 1, breath: 0.8, radio: 0.7 },
+    fade: 0.4,
+    room: 'corridor',
+    timeline: [
+      { at: 2.6, target: 'radio', to: 0, fade: 0.9 },
+      { at: 4.5, target: 'roomTone', to: 0, fade: 1.2 },
+      { at: 5.5, target: 'neon', to: 0, fade: 0.8 },
+    ],
+  },
+  // Plus rien : le cœur, et le souffle qu'il retient.
+  scareDark: {
+    levels: { heartbeat: 1, breath: 0.5 },
+    fade: 0.3,
+    room: 'corridor',
+    timeline: [{ at: 0.7, target: 'breath', to: 0.25, fade: 0.3 }],
+  },
+  scareTorch: { levels: { heartbeat: 1, breath: 0.7, drone: 0.7 }, fade: 0.5, room: 'corridor' },
+  scareJump: { levels: { heartbeat: 1, breath: 1.2 }, fade: 0.03, room: 'corridor' },
+  scareKick: { levels: { heartbeat: 1, breath: 1.2 }, fade: 0.05, room: 'corridor' },
+  // Sonné, il reprend son souffle ; plus il cherche, plus il le retient.
+  scareDrop: { levels: { heartbeat: 1, breath: 1.2 }, fade: 0.3, room: 'corridor' },
+  scarePick: { levels: { heartbeat: 1, breath: 0.9 }, fade: 0.3, room: 'corridor' },
+  scareSearch: { levels: { heartbeat: 1, breath: 0.5 }, fade: 0.6, room: 'corridor', timeline: [{ at: 1, target: 'breath', to: 0.15, fade: 0.5 }] },
+  // La lumière revient, pas le son : c'est le silence qui commence.
+  scareRestore: { levels: { heartbeat: 1 }, fade: 0.6, room: 'corridor' },
+}
+
+/** Les moments de l'exploration, là où le silence s'installe après le dossier. */
+const HUSHED_MOMENTS: readonly Moment[] = ['corridor', 'reading', 'answering', 'reacting']
+
+/**
+ * La balance d'un moment. `hushed` : le dossier a été refermé, le courant n'est
+ * jamais vraiment revenu. Plus que le cœur (les pas et les verdicts sont des
+ * sons ponctuels, ils passent). Les fins se jouent comme d'habitude, mais la
+ * radio reste morte.
+ */
+export function mixFor(moment: Moment, hushed: boolean): MomentMix {
+  const mix = MIXES[moment]
+  if (!hushed) return mix
+  if (HUSHED_MOMENTS.includes(moment)) return { ...mix, levels: { heartbeat: mix.levels.heartbeat ?? 1 } }
+  if (mix.levels.radio === undefined) return mix
+  const { radio: _radio, ...levels } = mix.levels
+  return { ...mix, levels, timeline: mix.timeline?.filter((step) => step.target !== 'radio') }
 }
 
 /** Vitesse du disque : il traîne toujours un peu, ce qui baisse aussi sa hauteur. */
@@ -246,6 +402,8 @@ export function musicSpeed(moment: Moment): MusicSpeed {
   switch (moment) {
     case 'freeze':
       return { rate: 0.3, glide: 0.8 }
+    case 'scareDim':
+      return { rate: 0.3, glide: 3.2 }
     case 'inject':
       return { rate: 0.72, glide: 0.1 }
     case 'infected':
@@ -291,6 +449,21 @@ export function breathRate(danger: number, running: boolean): number {
 
 export function heartbeatBpm(danger: number): number {
   return 62 + 76 * clamp01(danger)
+}
+
+/**
+ * Écart avant le battement suivant (s). Un cœur n'est pas un métronome : chaque
+ * battement arrive un peu en avance ou en retard, et il en rate presque un de temps en temps.
+ */
+export function heartbeatInterval(danger: number, beat: number): number {
+  const base = 60 / heartbeatBpm(danger)
+  const hash = (n: number) => {
+    const s = Math.sin(n * 127.1 + 311.7) * 43758.5453
+    return s - Math.floor(s)
+  }
+  const drift = (hash(beat) - 0.5) * 0.14
+  const stumble = hash(beat + 0.5) > 0.92 ? 0.2 : 0
+  return base * (1 + drift + stumble)
 }
 
 /** Le bruit de fond monte passé le premier tiers de l'infection. */

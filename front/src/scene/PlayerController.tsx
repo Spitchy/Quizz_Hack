@@ -1,7 +1,7 @@
 import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useRef } from 'react'
 import { Color, Vector3, type PointLight } from 'three'
-import { CCTV_STAGES, type DefeatStage } from '../app/sequence'
+import { CCTV_STAGES, type DefeatStage, type ScareStage } from '../app/sequence'
 import { playSound, setRunning } from '../audio/engine'
 import { advanceStride, createStride } from '../audio/footsteps'
 import { pinNeon } from '../audio/stage'
@@ -10,6 +10,7 @@ import { moveWithCollisions, type Circle, type Vec2 } from '../maze/physics'
 import { neonFlicker } from './flicker'
 import { EYE_HEIGHT, PALETTE } from './layout'
 import { baseTremor, decayTrauma, headBob, shakeOffset } from './motion'
+import { JUMP_AT, KICK_IMPACT, scareHalo, scareLook } from './scareMotion'
 
 // Contrôle à la première personne : déplacement au clavier (ZQSD/WASD, flèches),
 // regard à la souris (pointer lock) ou aux flèches gauche/droite, collisions
@@ -56,6 +57,8 @@ interface PlayerControllerProps {
   dazzled?: boolean
   /** Ce qu'il a sous les pieds : la moquette, ou le sol nu de la pièce blanche. */
   surface?: 'carpet' | 'hard'
+  /** Dossier refermé : en noir total, sa tête ne lui obéit plus. */
+  scare?: { stage: ScareStage; yaw: number } | null
 }
 
 const WALK_SPEED = 2.8
@@ -93,7 +96,7 @@ function lineOfSight(maze: Maze, a: Vec2, b: Vec2): boolean {
 }
 
 export function PlayerController(props: PlayerControllerProps) {
-  const { maze, readingEntity, canMove, lightsOff, shake, defeat = null, autoWalk = false, dazzled = false, surface = 'carpet' } = props
+  const { maze, readingEntity, canMove, lightsOff, shake, defeat = null, autoWalk = false, dazzled = false, surface = 'carpet', scare = null } = props
   const gl = useThree((state) => state.gl)
   const halo = useRef<PointLight>(null)
 
@@ -117,6 +120,9 @@ export function PlayerController(props: PlayerControllerProps) {
   const reported = useRef<{ key: string; yaw: number } | null>(null)
   // Défaite : début du figement (les néons meurent).
   const frozen = useRef({ stage: null as DefeatStage | null, freezeStart: 0 })
+  // Dossier refermé : début de l'étape en cours, et le choc déjà encaissé.
+  const scared = useRef({ stage: null as ScareStage | null, at: 0, jolted: false })
+  const crouch = useRef(0)
   // Les props changent à chaque rendu ; la boucle d'animation lit toujours les dernières.
   const latest = useRef(props)
   useEffect(() => {
@@ -302,6 +308,33 @@ export function PlayerController(props: PlayerControllerProps) {
       onNearEntity(null)
     }
 
+    // Le noir tombe : la tête se tourne vers le couloir, et ne bouge plus d'elle-même ensuite.
+    const scareState = scared.current
+    if (scare && scare.stage !== scareState.stage) {
+      scareState.stage = scare.stage
+      scareState.at = t
+      scareState.jolted = false
+    } else if (!scare) {
+      scareState.stage = null
+    }
+    const scareSince = t - scareState.at
+    if (!scare) crouch.current = 0
+    if (scare && scare.stage !== 'dim' && scare.stage !== 'restore' && scare.stage !== 'done') {
+      const look = scareLook(scare.stage, scareSince)
+      p.yaw += shortestAngle(p.yaw, scare.yaw + look.yaw) * Math.min(1, dt * 8)
+      p.pitch += (look.pitch - p.pitch) * Math.min(1, dt * 8)
+      crouch.current += (look.crouch - crouch.current) * Math.min(1, dt * 9)
+      // Il lui tombe dessus ; puis la semelle part avec tout son poids.
+      if (!scareState.jolted && scare.stage === 'jump' && scareSince >= JUMP_AT) {
+        scareState.jolted = true
+        trauma.current = 0.85
+      }
+      if (!scareState.jolted && scare.stage === 'kick' && scareSince >= KICK_IMPACT) {
+        scareState.jolted = true
+        trauma.current = 1
+      }
+    }
+
     // Un pas par foulée vraiment parcourue : contre un mur ou à l'arrêt, rien ne sonne.
     const running = keys.current.has('ShiftLeft') || keys.current.has('ShiftRight')
     const distance = Math.hypot(p.x - fromX, p.z - fromZ)
@@ -342,7 +375,7 @@ export function PlayerController(props: PlayerControllerProps) {
 
     if (!filmed) {
       camera.rotation.order = 'YXZ'
-      camera.position.set(p.x + b.x + s.x, EYE_HEIGHT + b.y + s.y + breathe, p.z)
+      camera.position.set(p.x + b.x + s.x, EYE_HEIGHT + b.y + s.y + breathe - crouch.current, p.z)
       camera.rotation.set(p.pitch + lookUp.current + s.pitch, p.yaw + s.yaw, b.roll + s.roll)
     }
 
@@ -368,6 +401,10 @@ export function PlayerController(props: PlayerControllerProps) {
           : defeat.stage === 'knockout'
             ? 0
             : 2.6 * Math.min(1, (sinceFreeze - 0.9) / 0.8) * (0.7 + 0.5 * beat)
+      } else if (scare) {
+        // Le halo suit les lampes, et meurt avec elles : dans le noir, il n'y a plus que la lampe torche.
+        halo.current.color.copy(NEON)
+        halo.current.intensity = HALO_INTENSITY * scareHalo(scare.stage, scareSince) * (0.65 + 0.35 * neonFlicker(t, danger, 99))
       } else {
         halo.current.color.copy(NEON)
         halo.current.intensity = lightsOff ? 0 : HALO_INTENSITY * (dazzled ? 2.5 : 0.65 + 0.35 * neonFlicker(t, danger, 99))

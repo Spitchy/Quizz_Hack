@@ -1,11 +1,12 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { beatSchedule, DEFEAT_TIMELINE, DOOR_TIMELINE, VICTORY_TIMELINE } from '../app/sequence'
+import { beatSchedule, DEFEAT_TIMELINE, DOOR_TIMELINE, INTRO_TIMELINE, SCARE_TIMELINE, VICTORY_TIMELINE } from '../app/sequence'
 import type { Phase } from '../game/types'
 import { generateCorridor } from '../maze/corridor'
 import { isFloor, TILE_SIZE } from '../maze/generate'
 import { ARCHETYPES } from '../scene/entities/archetypes'
 import { neonFlicker, neonIntensity } from '../scene/flicker'
+import { JUMP_AT, SCARE_SECONDS } from '../scene/scareMotion'
 import { collapseSounds, CUES, isBoneHit, MOMENT_SECONDS } from './cues'
 import { advanceStride, createStride } from './footsteps'
 import {
@@ -16,16 +17,19 @@ import {
   hazeGain,
   heartbeatBpm,
   heartbeatGain,
+  heartbeatInterval,
   LAYER_TRIM,
+  introMoment,
   LAYERS,
   MIXES,
+  mixFor,
   momentFor,
   musicSpeed,
   neonBuzzGain,
   volumeGain,
   type Moment,
 } from './mix'
-import { RECIPES } from './recipes'
+import { RECIPES, renderSound } from './recipes'
 import { SAMPLE_FILES, SOUNDTRACK } from './samples'
 import { DEFAULT_SETTINGS, loadSettings, saveSettings } from './settings'
 import { moodGain, moodRate, nearest, occlusionFor, VOICES, wallDepth } from './spatial'
@@ -89,6 +93,76 @@ describe('moments', () => {
   })
 })
 
+describe('le silence, une fois le dossier refermé', () => {
+  const corridorMoments = ['corridor', 'reading', 'answering', 'reacting'] as const
+
+  it('ne laisse que le cœur pendant l\u2019exploration', () => {
+    for (const m of corridorMoments) {
+      expect(Object.keys(mixFor(m, true).levels), m).toEqual(['heartbeat'])
+      expect(mixFor(m, true).levels.heartbeat, m).toBeGreaterThan(0)
+    }
+  })
+
+  it('coupe bien tout ce qu\u2019on a dit : disque, pièce, néons, drone, souffle, respiration', () => {
+    const levels = mixFor('corridor', true).levels
+    for (const layer of ['radio', 'roomTone', 'neon', 'drone', 'haze', 'breath', 'monsters'] as const) expect(levels[layer] ?? 0, layer).toBe(0)
+  })
+
+  it('ne change rien tant qu\u2019il n\u2019a pas refermé le dossier', () => {
+    for (const m of Object.keys(MIXES) as Moment[]) expect(mixFor(m, false), m).toBe(MIXES[m])
+  })
+
+  it('laisse les fins telles quelles, sauf la radio, morte pour de bon', () => {
+    expect(mixFor('beat', true)).toBe(MIXES.beat)
+    expect(mixFor('infected', true).levels.music).toBe(MIXES.infected.levels.music)
+    expect(mixFor('freeze', true).levels.radio ?? 0).toBe(0)
+    expect(mixFor('freeze', true).timeline?.some((step) => step.target === 'radio')).toBe(false)
+    expect(mixFor('freeze', true).levels.heartbeat).toBe(MIXES.freeze.levels.heartbeat)
+  })
+
+  it('reste silencieux quand la lumière revient', () => {
+    expect(Object.keys(MIXES.scareRestore.levels)).toEqual(['heartbeat'])
+    expect(MIXES.scareDark.levels.radio ?? 0).toBe(0)
+  })
+})
+
+describe('intro et scène du dossier', () => {
+  it('a une balance et un moment pour chaque étape', () => {
+    for (const [stage] of INTRO_TIMELINE) expect(MIXES[introMoment(stage)], stage).toBeDefined()
+    expect(introMoment('done')).toBe('silent')
+    for (const [stage] of SCARE_TIMELINE) {
+      if (stage !== 'done') expect(MIXES[momentFor('exploring', null, null, stage)], stage).toBeDefined()
+    }
+    expect(momentFor('exploring', null, null, 'done')).toBe('corridor')
+  })
+
+  it('laisse les fins passer avant la scène du dossier', () => {
+    expect(momentFor('gameOver', 'beat', null, 'torch')).toBe('beat')
+  })
+
+  it('fait entendre la pluie et le moteur seulement dehors', () => {
+    const outside = (Object.keys(MIXES) as Moment[]).filter((m) => (MIXES[m].levels.rain ?? 0) > 0)
+    for (const m of outside) expect(m.startsWith('intro'), m).toBe(true)
+    expect(MIXES.introNews.levels.tv).toBeGreaterThan(0)
+    expect(MIXES.introPocket.levels.tv ?? 0).toBe(0)
+    expect(MIXES.introPocket.levels.tvSmall ?? 0).toBe(0)
+  })
+
+  it('date les cris sur la scène : les cordes, le piano et le choc arrivent avec lui', () => {
+    const jump = CUES.scareJump!
+    for (const sound of ['violin-screech', 'piano-cluster', 'stinger'] as const) {
+      expect(jump.find((c) => c.sound === sound)?.at, sound).toBe(JUMP_AT)
+    }
+    expect(CUES.scareTorch!.some((c) => c.sound === 'violin-tension')).toBe(true)
+  })
+
+  it('coupe les cordes avant qu\u2019il saute : un instant de silence', () => {
+    const tension = CUES.scareTorch!.find((c) => c.sound === 'violin-tension')!
+    const seconds = 4.5
+    expect(tension.at + seconds).toBeLessThanOrEqual(SCARE_SECONDS.torch + JUMP_AT)
+  })
+})
+
 describe('la radio et le vieux disque', () => {
   const song = (m: Moment) => (MIXES[m].levels.music ?? 0) + (MIXES[m].levels.radio ?? 0)
 
@@ -149,6 +223,54 @@ describe('danger', () => {
   it('reste borné hors de 0..1', () => {
     expect(droneGain(5)).toBe(droneGain(1))
     expect(heartbeatBpm(-3)).toBe(heartbeatBpm(0))
+  })
+})
+
+describe('le cœur', () => {
+  /** La crête la plus forte entre deux instants (s). */
+  const peak = (samples: Float32Array, rate: number, from: number, to: number) => {
+    let max = 0
+    for (let i = Math.round(from * rate); i < Math.round(to * rate); i++) max = Math.max(max, Math.abs(samples[i]))
+    return max
+  }
+
+  it('bat tu-TUN : le premier coup, court et léger, lance le second, fort et grave', () => {
+    for (let variant = 0; variant < RECIPES.heartbeat.variants; variant++) {
+      const { samples, rate } = renderSound('heartbeat', variant)
+      const tu = peak(samples, rate, 0, 0.1)
+      const tun = peak(samples, rate, 0.13, 0.32)
+      expect(tu, `${variant}`).toBeGreaterThan(0.15)
+      expect(tun, `${variant}`).toBeGreaterThan(tu * 1.3)
+    }
+  })
+
+  it('enchaîne les deux coups de près, puis laisse le silence', () => {
+    for (let variant = 0; variant < RECIPES.heartbeat.variants; variant++) {
+      const { samples, rate } = renderSound('heartbeat', variant)
+      expect(peak(samples, rate, 0.58, 0.62), `${variant}`).toBeLessThan(0.05)
+    }
+  })
+
+  it('ne joue pas quatre fois le même battement', () => {
+    const a = Array.from(renderSound('heartbeat', 0).samples.subarray(0, 4000))
+    const b = Array.from(renderSound('heartbeat', 1).samples.subarray(0, 4000))
+    expect(a).not.toEqual(b)
+  })
+
+  it('n\u2019est pas un métronome, sans perdre son rythme', () => {
+    for (const danger of [0, 0.5, 1]) {
+      const intervals = Array.from({ length: 300 }, (_, beat) => heartbeatInterval(danger, beat))
+      const base = 60 / heartbeatBpm(danger)
+      const mean = intervals.reduce((sum, v) => sum + v, 0) / intervals.length
+      expect(new Set(intervals).size).toBeGreaterThan(100)
+      expect(Math.min(...intervals)).toBeGreaterThan(base * 0.9)
+      expect(Math.max(...intervals)).toBeLessThan(base * 1.3)
+      expect(Math.abs(mean - base)).toBeLessThan(base * 0.05)
+    }
+  })
+
+  it('a toujours fini ses deux coups avant le battement suivant, même au plus vite', () => {
+    expect(Math.min(...Array.from({ length: 300 }, (_, beat) => heartbeatInterval(1, beat)))).toBeGreaterThan(0.172 + 0.1)
   })
 })
 

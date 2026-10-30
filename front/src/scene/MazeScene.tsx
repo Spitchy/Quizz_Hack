@@ -2,7 +2,7 @@ import { Canvas, useFrame } from '@react-three/fiber'
 import { memo, useMemo, useRef } from 'react'
 import { Color, type FogExp2, type HemisphereLight } from 'three'
 import type { Question } from '../api/client'
-import { arrivalAt, beatSchedule, CCTV_STAGES, type DefeatStage, type VictoryStage } from '../app/sequence'
+import { arrivalAt, beatSchedule, CCTV_STAGES, type DefeatStage, type ScareStage, type VictoryStage } from '../app/sequence'
 import { toEntityState, toWorldState, upsetEntities, type EntityMood } from '../game/render'
 import type { GameSnapshot } from '../game/types'
 import { pathLength, planApproach } from '../maze/approach'
@@ -10,6 +10,7 @@ import type { ExitRoom } from '../maze/exitRoom'
 import { entityPlacement, tileCenter, type Maze } from '../maze/generate'
 import type { Circle } from '../maze/physics'
 import type { RadioSpot } from '../maze/radioSpot'
+import type { ScareLane } from '../maze/scareLane'
 import { Effects } from './Effects'
 import { entityLook, SIGN_HEIGHT, WALL_CLEARANCE, type EntityLook } from './entities/archetypes'
 import { breakFor } from './entities/signBreak'
@@ -24,6 +25,8 @@ import { PlayerBody } from './PlayerBody'
 import { SecurityCamera } from './SecurityCamera'
 import { PlayerController, type EntityPose, type PlayerInfo } from './PlayerController'
 import { RadioCorner } from './RadioCorner'
+import { FlashLight, KickLeg, ScareDoctor } from './ScareDoctor'
+import { isPitchBlack } from './scareMotion'
 import { Sign } from './Sign'
 import { SoundStage } from './SoundStage'
 import { WakeRoom } from './WakeRoom'
@@ -48,8 +51,12 @@ export interface MazeSceneProps {
   maze: Maze
   /** La radio et sa table, au milieu du niveau. */
   radio: RadioSpot | null
-  /** Le joueur a le nez dans le journal : il ne bouge plus. */
+  /** Il a le nez dans le dossier, ou le noir l'a figé : il ne bouge plus. */
   frozen: boolean
+  /** Dossier refermé : l'étape en cours, et le couloir d'où vient le médecin. */
+  scare: { stage: ScareStage; lane: ScareLane } | null
+  /** Le dossier n'est plus sur la table. */
+  paperGone: boolean
   exitRoom: ExitRoom
   snapshot: GameSnapshot
   defeatStage: DefeatStage | null
@@ -169,8 +176,24 @@ function LightSurge({ active }: { active: boolean }) {
   return null
 }
 
+/**
+ * Noir total : le fond et le brouillard passent au noir pur. Avec leur couleur
+ * habituelle, à peine visible, les murs se découperaient encore sur le fond.
+ */
+function Blackout({ on }: { on: boolean }) {
+  const level = useRef(1)
+  useFrame(({ scene }, dt) => {
+    if (!on && level.current >= 1) return
+    level.current = on ? Math.max(0, level.current - dt * 3) : Math.min(1, level.current + dt * 2)
+    const fog = scene.fog as FogExp2 | null
+    if (fog) fog.color.copy(VOID).multiplyScalar(level.current)
+    if (scene.background instanceof Color) scene.background.copy(VOID).multiplyScalar(level.current)
+  })
+  return null
+}
+
 function MazeContents(props: MazeSceneProps) {
-  const { maze, radio, frozen, snapshot, highlight, answer, defeatStage, victoryStage } = props
+  const { maze, radio, frozen, scare, paperGone, snapshot, highlight, answer, defeatStage, victoryStage } = props
   const { onNearEntity, onPlayerMoved, onHoverChoice, onPickChoice } = props
   const world = toWorldState(snapshot)
 
@@ -219,6 +242,8 @@ function MazeContents(props: MazeSceneProps) {
   }, [maze, radio, placements, upsetKey, snapshot.engagedEntity])
 
   const filmed = defeatStage !== null && CCTV_STAGES.includes(defeatStage)
+  const scareStage = scare?.stage ?? null
+  const pitchBlack = isPitchBlack(scareStage)
   const probe = useRef(createProbe())
 
   const reactionOf = (id: number): Reaction => {
@@ -237,7 +262,7 @@ function MazeContents(props: MazeSceneProps) {
     <>
       <color attach="background" args={[PALETTE.void]} />
       <fogExp2 attach="fog" args={[PALETTE.void, 0.12]} />
-      <ambientLight color="#4a4026" intensity={world.lightsOff ? 0 : 0.02} />
+      <ambientLight color="#4a4026" intensity={world.lightsOff || pitchBlack ? 0 : 0.02} />
       <LightSurge active={victoryStage === 'release'} />
 
       <PlayerController
@@ -255,10 +280,15 @@ function MazeContents(props: MazeSceneProps) {
         onPlayerMoved={onPlayerMoved}
         defeat={defeatStage ? { stage: defeatStage, faceYaw: roles.faceYaw, stand: roles.stand } : null}
         dazzled={victoryStage === 'release'}
+        scare={scare ? { stage: scare.stage, yaw: scare.lane.yaw } : null}
       />
 
-      <MazeWorld maze={maze} danger={world.danger} dark={world.lightsOff} surge={victoryStage === 'release' ? 1 : 0} />
-      {radio && <RadioCorner spot={radio} dark={world.lightsOff} />}
+      <MazeWorld maze={maze} danger={world.danger} dark={world.lightsOff} surge={victoryStage === 'release' ? 1 : 0} scare={scareStage} />
+      {radio && <RadioCorner spot={radio} dark={world.lightsOff || pitchBlack} blackout={pitchBlack} paperGone={paperGone} />}
+      <ScareDoctor stage={scareStage} lane={scare?.lane ?? null} />
+      <KickLeg stage={scareStage} />
+      <FlashLight stage={scareStage} lane={scare?.lane ?? null} />
+      <Blackout on={pitchBlack} />
       <DreadGlow on={filmed} />
       {/* Défaite filmée : son corps, son sang, la caméra du couloir. */}
       <PlayerBody stage={defeatStage} stand={roles.stand} yaw={roles.bodyYaw} hits={roles.bodyHits} probe={probe} />
@@ -267,9 +297,11 @@ function MazeContents(props: MazeSceneProps) {
       <ParticleWarmup />
       <ShaderWarmup deps={maze} />
 
-      {placements.map((p, i) => {
-        const slot = slots[i]
-        return (
+      {/* Dans le noir total, leurs yeux ne restent pas allumés au fond du couloir. */}
+      <group visible={!pitchBlack}>
+        {placements.map((p, i) => {
+          const slot = slots[i]
+          return (
           <EntitySlot
             key={`${maze.seed}-${p.id}`}
             id={p.id}
@@ -294,10 +326,11 @@ function MazeContents(props: MazeSceneProps) {
             onHover={slot.engaged ? onHoverChoice : undefined}
             onPick={slot.engaged ? onPickChoice : undefined}
           />
-        )
-      })}
+          )
+        })}
+      </group>
 
-      <Effects danger={defeatStage ? (filmed ? 0.35 : 1) : world.danger} shake={world.shake} cctv={filmed} />
+      <Effects danger={defeatStage ? (filmed ? 0.35 : 1) : world.danger} shake={scareStage === 'kick' ? 1 : world.shake} cctv={filmed} />
     </>
   )
 }
@@ -374,7 +407,7 @@ export function MazeScene(props: MazeSceneProps) {
         maze={worldFor(props.defeatStage, props.victoryStage) === 'maze' ? props.maze : null}
         radio={props.radio?.position ?? null}
         danger={world.danger}
-        dark={world.lightsOff}
+        dark={world.lightsOff || isPitchBlack(props.scare?.stage ?? null)}
         surge={props.victoryStage === 'release' ? 1 : 0}
       />
       <SceneContents {...props} />

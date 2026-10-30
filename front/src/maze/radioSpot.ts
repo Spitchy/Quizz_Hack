@@ -54,7 +54,7 @@ export function radioSpot(maze: Maze): RadioSpot | null {
   }
 }
 
-/** Le joueur peut lire le journal : sur la tuile de la table, ou juste à côté. */
+/** Le joueur peut ouvrir le dossier : sur la tuile de la table, ou juste à côté. */
 export function canReachRadio(maze: Maze, spot: RadioSpot | null, player: Tile | null): boolean {
   if (!spot || !player || !isFloor(maze, player.x, player.y)) return false
   return manhattan(spot.tile, player) <= 1

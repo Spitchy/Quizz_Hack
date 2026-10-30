@@ -7,6 +7,8 @@ import type { SoundName } from './recipes'
 const files = (name: string, count: number) => Array.from({ length: count }, (_, i) => `${name}-${i + 1}.wav`)
 
 export const SAMPLE_FILES: Partial<Record<SoundName, readonly string[]>> = {
+  // Le premier chargé : l'intro l'attend pour démarrer.
+  'news-broadcast': files('news-broadcast', 1),
   'step-carpet': files('step-carpet', 4),
   'step-hard': files('step-hard', 4),
   'hit-flesh': files('hit-flesh', 6),

@@ -22,12 +22,27 @@ const recipe = (rate: number, render: Recipe['render'], variants = 1): Recipe =>
 
 /** Dans l'ordre de priorité : ce qui sert en premier est calculé en premier. */
 export const RECIPES = {
+  // L'intro sonne dès le clic.
+  rain: recipe(MID, ambience.rain),
+  'news-sting': recipe(MID, events.newsSting),
+  // Repli si l'enregistrement manque : un parasite plutôt que rien.
+  'news-broadcast': recipe(MID, events.newsStatic),
+  'phone-lock': recipe(HI, events.phoneLock),
+  'van-idle': recipe(LOW, ambience.vanIdle),
+  'tire-screech': recipe(MID, events.tireScreech),
+  'van-door': recipe(MID, events.vanDoor),
+  'bat-swing': recipe(MID, events.batSwing),
+  breaker: recipe(MID, events.breaker),
+  'piano-cluster': recipe(MID, events.pianoCluster),
+  'violin-tension': recipe(HI, events.violinTension),
+  'violin-screech': recipe(HI, events.violinScreech),
+  'torch-clatter': recipe(HI, events.torchClatter),
   'room-tone': recipe(LOW, ambience.roomTone),
   paper: recipe(MID, events.paper),
   'old-noise': recipe(MID, ambience.oldNoise),
   'neon-buzz': recipe(MID, ambience.neonBuzz),
   'step-carpet': recipe(MID, events.stepCarpet, 4),
-  heartbeat: recipe(LOW, events.heartbeat),
+  heartbeat: recipe(LOW, events.heartbeat, 4),
   'bed-crt': recipe(HI, monsters.bedCrt),
   'bed-mannequin': recipe(HI, monsters.bedMannequin),
   'bed-cluster': recipe(MID, monsters.bedCluster),
