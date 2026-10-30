@@ -24,6 +24,8 @@ const NEON_RANGE = 14
 const MONSTER_RANGE = 22
 const NEON_HEIGHT = 2.75
 const RADIO_HEIGHT = 1
+/** Délai entre le hurlement et la réplique (s). */
+const SCREAM_LEAD = 1.1
 /** Tous les combien réattribuer les voix et recalculer les murs (s). */
 const RESCAN = 0.14
 /** Une entité qui ne donne plus de nouvelles (autre monde) se tait, sans couper sur un simple à-coup (s). */
@@ -397,7 +399,12 @@ export function playEntityStep(archetype: Archetype, x: number, z: number): void
 /** Réaction d'une entité à une mauvaise réponse. */
 export function playEntityAnger(id: number): void {
   const entity = entities.get(id)
-  if (entity) playAt(VOICES[entity.archetype].anger, [entity.x, VOICES[entity.archetype].height, entity.z], { gain: 1 })
+  if (!entity) return
+  const voice = VOICES[entity.archetype]
+  const at: CuePoint = [entity.x, voice.height, entity.z]
+  // Le hurlement d'abord, et les mots quand il retombe.
+  if (voice.scream) playAt(voice.scream, at, { gain: 1 })
+  playAt(voice.anger, at, { gain: 1, delay: voice.scream ? SCREAM_LEAD : 0 })
 }
 
 /** Bonne réponse : elle se défait en poussière, là où elle se tient. */

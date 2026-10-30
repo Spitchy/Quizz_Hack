@@ -261,6 +261,13 @@ describe('espace', () => {
     }
   })
 
+  it('fait hurler certains monstres, pas tous, avec un son qui existe', () => {
+    const screamers = ARCHETYPES.filter((a) => VOICES[a].scream)
+    expect(screamers.length).toBeGreaterThanOrEqual(3)
+    expect(screamers.length).toBeLessThan(ARCHETYPES.length)
+    for (const a of screamers) expect(RECIPES[VOICES[a].scream!]).toBeDefined()
+  })
+
   it('fait enfler et ralentir la voix avec la colère', () => {
     expect(moodGain('menace')).toBeGreaterThan(moodGain('calm'))
     expect(moodRate('menace')).toBeLessThan(moodRate('calm'))
@@ -310,7 +317,7 @@ describe('enregistrements', () => {
   it('remplacent des sons du catalogue et restent légers', () => {
     for (const name of Object.keys(SAMPLE_FILES)) expect(RECIPES).toHaveProperty(name)
     const bytes = listed.reduce((sum, file) => sum + statSync(new URL(file, folder)).size, 0)
-    expect(bytes).toBeLessThan(2.5 * 1024 * 1024)
+    expect(bytes).toBeLessThan(3.5 * 1024 * 1024)
   })
 })
 

@@ -57,8 +57,10 @@ export interface VoiceProfile {
   gain: number
   /** Distance (m) où le son commence à décroître. */
   ref: number
-  /** Cri ou réaction à une mauvaise réponse. */
+  /** Réplique à une mauvaise réponse. */
   anger: SoundName
+  /** Hurlement avant la réplique : certains seulement crient. */
+  scream?: SoundName
   /** Bruit d'un pas pendant la marche de la défaite. */
   step: SoundName
   height: number
@@ -66,11 +68,11 @@ export interface VoiceProfile {
 
 export const VOICES: Record<Archetype, VoiceProfile> = {
   crt: { bed: 'bed-crt', gain: 0.62, ref: 1.5, anger: 'anger-crt', step: 'step-hard', height: 1.7 },
-  mannequin: { bed: 'bed-mannequin', gain: 0.85, ref: 1.6, anger: 'anger-mannequin', step: 'step-plastic', height: 1.4 },
-  cluster: { bed: 'bed-cluster', gain: 0.8, ref: 1.8, anger: 'anger-cluster', step: 'step-wet', height: 0.9 },
-  crawler: { bed: 'bed-crawler', gain: 0.75, ref: 1.6, anger: 'anger-crawler', step: 'step-skitter', height: 0.4 },
-  child: { bed: 'bed-child', gain: 0.52, ref: 1.4, anger: 'anger-child', step: 'step-small', height: 1.1 },
-  tall: { bed: 'bed-tall', gain: 1, ref: 3, anger: 'anger-tall', step: 'step-heavy', height: 2.4 },
+  mannequin: { bed: 'bed-mannequin', gain: 0.85, ref: 1.6, anger: 'anger-mannequin', scream: 'scream-mannequin', step: 'step-plastic', height: 1.4 },
+  cluster: { bed: 'bed-cluster', gain: 0.8, ref: 1.8, anger: 'anger-cluster', scream: 'scream-cluster', step: 'step-wet', height: 0.9 },
+  crawler: { bed: 'bed-crawler', gain: 0.75, ref: 1.6, anger: 'anger-crawler', scream: 'scream-crawler', step: 'step-skitter', height: 0.4 },
+  child: { bed: 'bed-child', gain: 0.52, ref: 1.4, anger: 'anger-child', scream: 'scream-child', step: 'step-small', height: 1.1 },
+  tall: { bed: 'bed-tall', gain: 1, ref: 3, anger: 'anger-tall', scream: 'scream-tall', step: 'step-heavy', height: 2.4 },
 }
 
 /** Niveau de la présence selon l'humeur : elle enfle avec la colère. */

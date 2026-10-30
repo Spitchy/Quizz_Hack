@@ -46,6 +46,26 @@ Mélanges faits pour le jeu : un grondement généré en code et des enregistrem
 
 Sources : [Monster Sound Effects 2](https://opengameart.org/content/monster-sound-effects-2), [Ghost Monster Voice Moaning & Growling](https://opengameart.org/content/ghost-monster-voice-moaning-growling).
 
+## Hurlements et respiration
+
+Mélanges faits pour le jeu : enregistrements transposés, étirés et saturés. Tous CC0, et leurs auteurs indiquent les avoir créés eux-mêmes.
+
+| Fichier | Sources | Auteur | Licence |
+| --- | --- | --- | --- |
+| `scream-child-1.wav` | `scream_01.ogg`, `scream_02.ogg` | rubberduck | CC0 1.0 |
+| `scream-child-2.wav` | `scream_02.ogg`, `alien_03.ogg` | rubberduck | CC0 1.0 |
+| `scream-crawler-1.wav` | `insectoralien.flac`, `alien_06.ogg`, `monster_01.ogg` | qubodup, rubberduck | CC0 1.0 |
+| `scream-crawler-2.wav` | `insectoralien.flac`, `alien_02.ogg`, `monster_02.ogg` | qubodup, rubberduck | CC0 1.0 |
+| `scream-mannequin-1.wav` | `scream_02.ogg`, `hurt_02.ogg` | rubberduck | CC0 1.0 |
+| `scream-mannequin-2.wav` | `scream_01.ogg`, `hurt_03.ogg` | rubberduck | CC0 1.0 |
+| `scream-cluster-1.wav` | `scream_01.ogg`, `roar_02.ogg`, `monster_06.ogg` | rubberduck | CC0 1.0 |
+| `scream-cluster-2.wav` | `scream_02.ogg`, `roar_03.ogg`, `monster_07.ogg` | rubberduck | CC0 1.0 |
+| `scream-tall-1.wav` | `howl.ogg`, `roar_02.ogg`, `scream_01.ogg` | rubberduck | CC0 1.0 |
+| `scream-tall-2.wav` | `howl.ogg`, `monster_07.ogg`, `scream_02.ogg` | rubberduck | CC0 1.0 |
+| `breath-1.wav` | `ghostbreath.flac` | qubodup | CC0 1.0 |
+
+Sources : [80 CC0 creature SFX](https://opengameart.org/content/80-cc0-creature-sfx), [Insect or alien scream](https://opengameart.org/content/insect-or-alien-scream), [Ghost breath](https://opengameart.org/content/ghost-breath).
+
 ## Répliques des monstres
 
 Voix de synthèse, sans aucun enregistrement de voix fait pour le jeu. Générées hors ligne avec [Piper](https://github.com/OHF-voice/piper1-gpl) (outil GPL, utilisé seulement pour produire les fichiers, absent du jeu) et la voix [`fr_FR-gilles-low`](https://huggingface.co/rhasspy/piper-voices/tree/main/fr/fr_FR/gilles/low), puis transposées et déformées, mêlées aux sons CC0 ci-dessus.
@@ -73,4 +93,4 @@ Voix de synthèse, sans aucun enregistrement de voix fait pour le jeu. Généré
 
 ## Générés en code
 
-Tout le reste est calculé par le jeu (`src/audio/recipes/`), sans fichier ni licence tierce : ambiance de la pièce, néons, drone, cœur, parasites, souffle de bande, souffle et craquements du disque, froissement du journal, acouphène, respiration, goutte de perfusion, présences des monstres, aiguille, piston, rire du médecin, glitchs, vent et herbe. L'air que fredonne l'enfant est *Au clair de la lune*, du domaine public.
+Tout le reste est calculé par le jeu (`src/audio/recipes/`), sans fichier ni licence tierce : ambiance de la pièce, néons, drone, cœur, parasites, souffle de bande, souffle et craquements du disque, froissement du journal, acouphène, goutte de perfusion, présences des monstres, aiguille, piston, rire du médecin, glitchs, vent et herbe. L'air que fredonne l'enfant est *Au clair de la lune*, du domaine public.

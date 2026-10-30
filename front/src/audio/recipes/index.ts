@@ -42,6 +42,12 @@ export const RECIPES = {
   'anger-crawler': recipe(HI, monsters.angerCrawler),
   'anger-child': recipe(HI, monsters.angerChild),
   'anger-tall': recipe(MID, monsters.angerTall),
+  // Repli si l'enregistrement manque : le cri généré de chaque monstre.
+  'scream-child': recipe(HI, monsters.angerChild),
+  'scream-crawler': recipe(HI, monsters.angerCrawler),
+  'scream-mannequin': recipe(HI, monsters.angerMannequin),
+  'scream-cluster': recipe(MID, monsters.angerCluster),
+  'scream-tall': recipe(MID, monsters.angerTall),
   'power-down': recipe(MID, events.powerDown),
   'tape-hiss': recipe(HI, ambience.tapeHiss),
   'step-hard': recipe(HI, events.stepHard, 3),
