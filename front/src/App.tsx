@@ -5,6 +5,7 @@ import { audioDebug, stopSounds, unlockAudio } from './audio/engine'
 import './app/app.css'
 import { DEV_TOKEN, TIMING } from './app/config'
 import { DefeatOverlay, GameOverOverlay, VictoryOverlay, VictoryScreen } from './app/endings'
+import { SoundControl } from './app/SoundControl'
 import { beatSchedule, DEFEAT_TIMELINE, DOOR_TIMELINE, useTimeline, VICTORY_TIMELINE, type DefeatStage } from './app/sequence'
 import { ErrorScreen, LoadingScreen, TitleScreen } from './app/screens'
 import {
@@ -188,6 +189,7 @@ export default function App() {
       onContextMenu={(e) => e.preventDefault()}
     >
       {content}
+      <SoundControl />
     </div>
   )
 }
