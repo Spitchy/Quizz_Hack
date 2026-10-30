@@ -102,7 +102,7 @@ export const LAYER_TRIM: Record<Layer, number> = {
   haze: 0.06,
   tape: 0.05,
   tinnitus: 0.07,
-  breath: 0.16,
+  breath: 0.34,
   drip: 0.22,
   glitchBed: 0.3,
   wind: 0.5,
@@ -142,28 +142,28 @@ const OPEN_EARS = 18000
 export const MIXES: Record<Moment, MomentMix> = {
   silent: { levels: {}, fade: 0.25 },
   corridor: {
-    levels: { roomTone: 0.5, neon: 0.8, drone: 1, heartbeat: 1, monsters: 1, haze: 1, radio: 1 },
+    levels: { roomTone: 0.5, neon: 0.8, drone: 1, heartbeat: 1, breath: 0.8, monsters: 1, haze: 1, radio: 1 },
     fade: 0.9,
     room: 'corridor',
   },
   reading: {
-    levels: { roomTone: 0.32, neon: 0.45, drone: 0.8, heartbeat: 1, monsters: 0.75, haze: 0.8, radio: 0.7 },
+    levels: { roomTone: 0.32, neon: 0.45, drone: 0.8, heartbeat: 1, breath: 0.9, monsters: 0.75, haze: 0.8, radio: 0.7 },
     fade: 0.7,
     room: 'corridor',
   },
   answering: {
-    levels: { roomTone: 0.1, neon: 0.1, drone: 0.2, heartbeat: 0.5, monsters: 0.15, radio: 0.12 },
+    levels: { roomTone: 0.1, neon: 0.1, drone: 0.2, heartbeat: 0.5, breath: 0.2, monsters: 0.15, radio: 0.12 },
     fade: 0.09,
     room: 'corridor',
   },
   reacting: {
-    levels: { roomTone: 0.4, neon: 0.6, drone: 1, heartbeat: 1, monsters: 1, haze: 1, radio: 0.55 },
+    levels: { roomTone: 0.4, neon: 0.6, drone: 1, heartbeat: 1, breath: 1, monsters: 1, haze: 1, radio: 0.55 },
     fade: 0.5,
     room: 'corridor',
   },
   // Les néons meurent : il ne reste que le cœur, dans un quasi-silence.
   freeze: {
-    levels: { roomTone: 0.06, heartbeat: 1, radio: 0.8 },
+    levels: { roomTone: 0.06, heartbeat: 1, breath: 1, radio: 0.8 },
     fade: 0.2,
     room: 'corridor',
     // La radio ralentit avec le courant, puis s'éteint.
@@ -261,7 +261,7 @@ const clamp01 = (v: number) => Math.min(1, Math.max(0, v))
 
 /** Niveau du drone : à peine là au début, écrasant à la dernière erreur. */
 export function droneGain(danger: number): number {
-  return 0.012 + 0.16 * clamp01(danger) ** 1.3
+  return 0.012 + 0.105 * clamp01(danger) ** 1.3
 }
 
 /** Le drone s'ouvre en aigus avec le danger. */
@@ -274,10 +274,19 @@ export function droneDetune(danger: number): number {
   return 3 + 26 * clamp01(danger)
 }
 
-/** Cœur inaudible tant que tout va bien, puis de plus en plus présent. */
+/** Le cœur s'entend toujours, et finit par couvrir le reste. */
 export function heartbeatGain(danger: number): number {
-  const d = clamp01(danger)
-  return d < 0.15 ? 0 : 0.2 + 0.62 * ((d - 0.15) / 0.85)
+  return 0.24 + 0.86 * clamp01(danger)
+}
+
+/** Il respire de plus en plus fort, à mesure que l'infection monte. */
+export function breathGain(danger: number): number {
+  return 0.42 + 0.58 * clamp01(danger)
+}
+
+/** Et de plus en plus vite ; `running` : il court, il manque d'air. */
+export function breathRate(danger: number, running: boolean): number {
+  return (0.9 + 0.5 * clamp01(danger)) * (running ? 1.22 : 1)
 }
 
 export function heartbeatBpm(danger: number): number {

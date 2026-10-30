@@ -16,6 +16,7 @@ export const SAMPLE_FILES: Partial<Record<SoundName, readonly string[]>> = {
   'door-latch': files('door-latch', 1),
   'door-creak': files('door-creak', 1),
   stinger: files('stinger', 3),
+  breath: files('breath', 1),
   'scream-child': files('scream-child', 2),
   'scream-crawler': files('scream-crawler', 2),
   'scream-mannequin': files('scream-mannequin', 2),

@@ -9,6 +9,8 @@ import { neonFlicker, neonIntensity } from '../scene/flicker'
 import { collapseSounds, CUES, isBoneHit, MOMENT_SECONDS } from './cues'
 import { advanceStride, createStride } from './footsteps'
 import {
+  breathGain,
+  breathRate,
   droneCutoff,
   droneGain,
   hazeGain,
@@ -127,10 +129,21 @@ describe('danger', () => {
     }
   })
 
-  it('laisse le cœur muet tant qu\'il n\'y a pas d\'erreur', () => {
-    expect(heartbeatGain(0)).toBe(0)
-    expect(heartbeatGain(1 / 3)).toBeGreaterThan(0)
+  it('fait entendre le cœur et la respiration dès le début', () => {
+    expect(heartbeatGain(0)).toBeGreaterThan(0.1)
+    expect(heartbeatGain(1)).toBeGreaterThan(1)
+    expect(breathGain(0)).toBeGreaterThan(0.2)
+    expect(MIXES.corridor.levels.breath).toBeGreaterThan(0)
     expect(hazeGain(0)).toBe(0)
+  })
+
+  it('accélère la respiration avec le danger et la course', () => {
+    expect(breathRate(1, false)).toBeGreaterThan(breathRate(0, false))
+    expect(breathRate(0, true)).toBeGreaterThan(breathRate(0, false))
+  })
+
+  it('fait retenir son souffle juste avant le verdict', () => {
+    expect(MIXES.answering.levels.breath!).toBeLessThan(MIXES.corridor.levels.breath! * 0.5)
   })
 
   it('reste borné hors de 0..1', () => {

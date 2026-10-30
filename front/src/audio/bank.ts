@@ -9,6 +9,7 @@ const buffers = new Map<SoundName, (AudioBuffer | undefined)[]>()
 const waiting = new Map<SoundName, (() => void)[]>()
 const lastPlayed = new Map<SoundName, number>()
 const sampled = new Set<SoundName>()
+const recordingListeners = new Map<SoundName, ((buffer: AudioBuffer) => void)[]>()
 let started = false
 
 function store(sound: RenderedSound) {
@@ -55,6 +56,7 @@ export function loadSamples(ctx: BaseAudioContext): void {
       if (decoded.length) {
         buffers.set(name, decoded)
         sampled.add(name)
+        recordingListeners.get(name)?.forEach((callback) => callback(decoded[0]))
       }
     }
   })()
@@ -78,6 +80,11 @@ export function whenReady(name: SoundName, callback: () => void): void {
     return
   }
   waiting.set(name, [...(waiting.get(name) ?? []), callback])
+}
+
+/** Appelle `callback` quand l'enregistrement remplace le son généré (pour une boucle déjà lancée). */
+export function whenRecorded(name: SoundName, callback: (buffer: AudioBuffer) => void): void {
+  recordingListeners.set(name, [...(recordingListeners.get(name) ?? []), callback])
 }
 
 /** État de la banque, pour les outils de test. */

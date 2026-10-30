@@ -1,9 +1,11 @@
-import { bankStatus, loadSamples, pickBuffer, whenReady } from './bank'
+import { bankStatus, loadSamples, pickBuffer, whenReady, whenRecorded } from './bank'
 import {
   droneCutoff,
   droneDetune,
   droneGain,
   DUCKS,
+  breathGain,
+  breathRate,
   heartbeatBpm,
   hazeGain,
   heartbeatGain,
@@ -59,6 +61,8 @@ interface Graph {
   droneVoices: OscillatorNode[]
   heartLevel: GainNode
   hazeLevel: GainNode
+  breathLevel: GainNode
+  breathing: { source: AudioBufferSourceNode | null }
   /** Le vieux disque, lu en continu : jamais décodé d'un bloc. */
   song: HTMLAudioElement
   /** Sortie de la radio, à brancher sur sa voix dans le monde. */
@@ -74,6 +78,7 @@ let moment: Moment = 'silent'
 let danger = 0
 let openedAt = 0
 let abrupt = false
+let running = false
 
 /** Journal des sons joués, pour vérifier la synchronisation (outils de test). */
 const history: { sound: string; at: number; moment: Moment }[] = []
@@ -264,7 +269,23 @@ function buildGraph(ctx: AudioContext): Graph {
   const haze = loopLayer('tape-hiss', hazeLevel)
   const tape = loopLayer('tape-hiss', cctvWet)
   const tinnitus = loopLayer('tinnitus', buses.effects)
-  const breath = loopLayer('breath', buses.effects)
+  // Respiration : le niveau suit le moment et le danger ; la vitesse, le danger et la course.
+  const breathLevel = gain(0, buses.effects)
+  const breath = gain(0, breathLevel)
+  const breathing: { source: AudioBufferSourceNode | null } = { source: null }
+  const startBreathing = (buffer: AudioBuffer | null) => {
+    if (!buffer) return
+    breathing.source?.stop()
+    const source = ctx.createBufferSource()
+    source.buffer = buffer
+    source.loop = true
+    source.playbackRate.value = breathRate(danger, running)
+    source.connect(breath)
+    source.start()
+    breathing.source = source
+  }
+  whenReady('breath', () => startBreathing(pickBuffer('breath')))
+  whenRecorded('breath', startBreathing)
   const dripPan = ctx.createStereoPanner()
   dripPan.pan.value = -0.55
   dripPan.connect(buses.effects)
@@ -335,12 +356,12 @@ function buildGraph(ctx: AudioContext): Graph {
     return osc
   })
   // Le filtre respire lentement.
-  const breathRate = ctx.createOscillator()
-  breathRate.frequency.value = 0.11
-  const breathDepth = gain(26)
-  breathRate.connect(breathDepth)
-  breathDepth.connect(droneFilter.frequency)
-  breathRate.start()
+  const filterDrift = ctx.createOscillator()
+  filterDrift.frequency.value = 0.11
+  const filterDepth = gain(26)
+  filterDrift.connect(filterDepth)
+  filterDepth.connect(droneFilter.frequency)
+  filterDrift.start()
 
   // --- Cœur : gain de moment, gain de danger. ---
   const heartMix = gain(0, buses.effects)
@@ -389,6 +410,8 @@ function buildGraph(ctx: AudioContext): Graph {
     droneVoices,
     heartLevel,
     hazeLevel,
+    breathLevel,
+    breathing,
     song,
     radio,
     active: new Set(),
@@ -466,6 +489,11 @@ function stopAll(g: Graph, at: number): void {
   g.active.clear()
 }
 
+function applyBreathing(g: Graph, now: number): void {
+  glide(g.breathLevel.gain, breathGain(danger) * (running ? 1.3 : 1), 0.6, now)
+  if (g.breathing.source) glide(g.breathing.source.playbackRate, breathRate(danger, running), 0.8, now)
+}
+
 function applyDanger(g: Graph): void {
   const now = g.ctx.currentTime
   glide(g.droneLevel.gain, droneGain(danger), 0.9, now)
@@ -474,6 +502,7 @@ function applyDanger(g: Graph): void {
   g.droneVoices.forEach((osc, i) => glide(osc.detune, i % 2 ? detune : -detune, 0.9, now))
   glide(g.heartLevel.gain, heartbeatGain(danger), 0.6, now)
   glide(g.hazeLevel.gain, hazeGain(danger), 0.9, now)
+  applyBreathing(g, now)
 }
 
 // --- Cœur : planifié d'avance sur l'horloge audio. ---
@@ -540,6 +569,13 @@ export function audioNodes() {
       ambience: graph.buses.ambience,
     }
   )
+}
+
+/** Il court : il manque d'air. */
+export function setRunning(value: boolean): void {
+  if (running === value) return
+  running = value
+  if (graph) applyBreathing(graph, graph.ctx.currentTime)
 }
 
 export function setDanger(value: number): void {

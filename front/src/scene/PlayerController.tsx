@@ -2,7 +2,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useRef } from 'react'
 import { Color, Vector3, type PointLight } from 'three'
 import { CCTV_STAGES, type DefeatStage } from '../app/sequence'
-import { playSound } from '../audio/engine'
+import { playSound, setRunning } from '../audio/engine'
 import { advanceStride, createStride } from '../audio/footsteps'
 import { pinNeon } from '../audio/stage'
 import { isFloor, tileAt, tileCenter, type Maze, type Tile } from '../maze/generate'
@@ -304,7 +304,9 @@ export function PlayerController(props: PlayerControllerProps) {
 
     // Un pas par foulée vraiment parcourue : contre un mur ou à l'arrêt, rien ne sonne.
     const running = keys.current.has('ShiftLeft') || keys.current.has('ShiftRight')
-    if (advanceStride(stride.current, Math.hypot(p.x - fromX, p.z - fromZ), dt, running)) {
+    const distance = Math.hypot(p.x - fromX, p.z - fromZ)
+    setRunning(running && distance > 0)
+    if (advanceStride(stride.current, distance, dt, running)) {
       playSound(surface === 'hard' ? 'step-hard' : 'step-carpet', {
         gain: (surface === 'hard' ? 0.32 : 0.5) * (running ? 1.25 : 1),
         rate: (stride.current.foot ? 0.97 : 1.03) * (running ? 1.06 : 1),
