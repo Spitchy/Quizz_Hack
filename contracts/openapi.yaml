@@ -1,0 +1,769 @@
+openapi: 3.0.3
+
+info:
+  title: Quizz_Hack Game API
+  version: 1.0.0
+  description: >
+    Contrat d'API pour Quizz_Hack — un jeu de quiz horrifique à la première
+    personne dans un labyrinthe. Le client (moteur 3D) consomme cette API pour
+    piloter la boucle de jeu : démarrer une session, récupérer la question de
+    l'intersection courante, soumettre une réponse et consulter le statut.
+
+    Le serveur reste la source de vérité pour le score, le compteur d'erreurs et
+    l'état visuel à afficher (objet `visualFeedback`). Le client se contente de
+    rendre l'état renvoyé par le serveur.
+  contact:
+    name: Équipe Quizz_Hack
+    url: https://github.com/Spitchy/Quizz_Hack
+  license:
+    name: ISC
+    url: https://opensource.org/license/isc-license-txt
+
+servers:
+  - url: http://localhost:3000
+    description: Serveur de développement local
+
+tags:
+  - name: Game
+    description: Boucle de jeu — sessions, questions, réponses et statut.
+  - name: System
+    description: Supervision et santé du service.
+
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Vérifier la santé de l'API
+      description: Retourne l'état de disponibilité du service. Utilisé par la supervision.
+      tags:
+        - System
+      responses:
+        '200':
+          description: Le service est opérationnel.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+              example:
+                status: OK
+                service: Quizz_Hack Back-End Game API
+                timestamp: '2026-10-27T10:18:00.000Z'
+
+  /api/game/start:
+    post:
+      operationId: startGame
+      summary: Démarrer une nouvelle session de jeu
+      description: >
+        Ouvre une nouvelle session après identification du joueur auprès du Hub
+        via son `fsq_token`. Retourne l'état initial du jeu et la première
+        question.
+      tags:
+        - Game
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartGameRequest'
+            example:
+              fsq_token: fsq_token_jwt_ou_chaine_recue
+      responses:
+        '201':
+          description: Session créée avec succès.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StartGameResponse'
+              example:
+                sessionId: a81bc81b-dead-beef-4242-abcdef123456
+                player:
+                  playerId: player_mock_001
+                  pseudo: ShadowRunner
+                  level: 1
+                gameState:
+                  gameStatus: IN_PROGRESS
+                  currentLevel: 1
+                  intersectionIndex: 0
+                  totalIntersections: 10
+                  score: 0
+                  scoreMax: 1000
+                  errors: 0
+                  maxErrors: 6
+                  visualFeedback:
+                    signBroken: false
+                    entityState: CALM
+                    lightsOff: false
+                currentQuestion:
+                  id: lvl1_q1
+                  level: 1
+                  text: >-
+                    Une créature pétrifiée tient une clé USB rouillée étiquetée
+                    'CONFIDENTIEL'. Que dois-tu faire ?
+                  choices:
+                    - La brancher immédiatement pour inspecter son contenu
+                    - Ne pas la brancher et l'isoler (risque de BadUSB / malware)
+                    - La formater rapidement sur un poste de travail du labyrinthe
+                    - Demander à l'entité si elle contient le mot de passe de sortie
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/game/question:
+    get:
+      operationId: getCurrentQuestion
+      summary: Récupérer la question de l'intersection courante
+      description: >
+        Permet au client de réinterroger la question de l'intersection active
+        d'une session, par exemple après un rechargement du moteur 3D.
+      tags:
+        - Game
+      parameters:
+        - name: sessionId
+          in: query
+          required: true
+          description: Identifiant de la session de jeu.
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Question courante de la session.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentQuestionResponse'
+              example:
+                sessionId: a81bc81b-dead-beef-4242-abcdef123456
+                intersectionIndex: 0
+                totalIntersections: 10
+                currentLevel: 1
+                question:
+                  id: lvl1_q1
+                  level: 1
+                  text: >-
+                    Une créature pétrifiée tient une clé USB rouillée étiquetée
+                    'CONFIDENTIEL'. Que dois-tu faire ?
+                  choices:
+                    - La brancher immédiatement pour inspecter son contenu
+                    - Ne pas la brancher et l'isoler (risque de BadUSB / malware)
+                    - La formater rapidement sur un poste de travail du labyrinthe
+                    - Demander à l'entité si elle contient le mot de passe de sortie
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/game/answer:
+    post:
+      operationId: submitAnswer
+      summary: Soumettre une réponse à l'intersection courante
+      description: >
+        Valide la réponse du joueur à l'intersection courante et renvoie l'état
+        immédiat pour le moteur visuel : correction, score, compteur d'erreurs,
+        état visuel, direction et question suivantes. En cas de 6e erreur, le
+        statut passe à `GAME_OVER_HACK`.
+      tags:
+        - Game
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitAnswerRequest'
+            example:
+              sessionId: a81bc81b-dead-beef-4242-abcdef123456
+              questionId: lvl1_q1
+              answer: 1
+              chosenDirection: LEFT
+      responses:
+        '200':
+          description: >
+            Réponse traitée. Le corps reflète l'état du jeu après la réponse
+            (en cours, victoire ou défaite).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubmitAnswerResponse'
+              examples:
+                enCours:
+                  summary: Bonne réponse, partie en cours
+                  value:
+                    isCorrect: true
+                    gameStatus: IN_PROGRESS
+                    score: 60
+                    scoreMax: 1000
+                    currentLevel: 1
+                    errors: 0
+                    maxErrors: 6
+                    visualFeedback:
+                      signBroken: false
+                      entityState: CALM
+                      lightsOff: false
+                    nextDirection: LEFT
+                    nextQuestion:
+                      id: lvl1_q2
+                      level: 1
+                      text: L'entité te tend un message sanglant...
+                      choices:
+                        - Cliquer sur le lien pour en savoir plus
+                        - Signaler le message comme tentative de phishing
+                        - Répondre avec ses identifiants
+                        - Transférer le message à toute l'équipe
+                    hubSyncResult: null
+                defaite:
+                  summary: 6e erreur — défaite (déclenche le hack côté client)
+                  value:
+                    isCorrect: false
+                    gameStatus: GAME_OVER_HACK
+                    score: 120
+                    scoreMax: 1000
+                    currentLevel: 3
+                    errors: 6
+                    maxErrors: 6
+                    visualFeedback:
+                      signBroken: true
+                      entityState: SMILING_IN_DARK
+                      lightsOff: true
+                    nextDirection: null
+                    nextQuestion: null
+                    hubSyncResult:
+                      accepted: true
+                      xpGained: 12
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: La session est déjà terminée ; aucune réponse n'est acceptée.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: SESSION_ALREADY_ENDED
+                message: Cette session est terminée ; aucune réponse ne peut être soumise.
+
+  /api/game/status/{sessionId}:
+    get:
+      operationId: getGameStatus
+      summary: Consulter le statut complet d'une session
+      description: >
+        Retourne le statut complet d'une session : score, erreurs, niveau,
+        état visuel et historique du parcours (`pathHistory`).
+      tags:
+        - Game
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          description: Identifiant de la session de jeu.
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Statut complet de la session.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GameStatusResponse'
+              example:
+                sessionId: a81bc81b-dead-beef-4242-abcdef123456
+                playerId: player_mock_001
+                pseudo: ShadowRunner
+                gameStatus: IN_PROGRESS
+                currentLevel: 2
+                intersectionIndex: 2
+                totalIntersections: 10
+                score: 120
+                scoreMax: 1000
+                errors: 0
+                maxErrors: 6
+                pathHistory:
+                  - intersectionIndex: 0
+                    questionId: lvl1_q1
+                    chosenDirection: LEFT
+                    isCorrect: true
+                    level: 1
+                    pointsEarned: 60
+                    timestamp: '2026-10-27T10:18:00.000Z'
+                visualFeedback:
+                  signBroken: false
+                  entityState: CALM
+                  lightsOff: false
+                hubSyncResult: null
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+components:
+  schemas:
+
+    GameStatus:
+      type: string
+      description: Statut global de la partie.
+      enum:
+        - IN_PROGRESS
+        - VICTORY
+        - GAME_OVER_HACK
+
+    EntityState:
+      type: string
+      description: État visuel de l'entité qui tient le panneau.
+      enum:
+        - CALM
+        - ANGRY
+        - SMILING_IN_DARK
+        - VANISHED
+
+    Direction:
+      type: string
+      description: Direction de course vers l'intersection suivante.
+      enum:
+        - LEFT
+        - RIGHT
+
+    VisualFeedback:
+      type: object
+      description: >
+        État visuel que le moteur 3D doit rendre. Le serveur en est la source de
+        vérité ; le client ne fait que l'appliquer.
+      additionalProperties: false
+      required:
+        - signBroken
+        - entityState
+        - lightsOff
+      properties:
+        signBroken:
+          type: boolean
+          description: Vrai si le panneau de l'entité est brisé (mauvaise réponse).
+        entityState:
+          $ref: '#/components/schemas/EntityState'
+        lightsOff:
+          type: boolean
+          description: Vrai si les lumières du labyrinthe sont éteintes (défaite).
+
+    Question:
+      type: object
+      description: Une question affichée sur le panneau d'une intersection.
+      additionalProperties: false
+      required:
+        - id
+        - level
+        - text
+        - choices
+      properties:
+        id:
+          type: string
+          description: Identifiant unique de la question.
+          example: lvl1_q1
+        level:
+          type: integer
+          description: Niveau de difficulté de la question.
+          minimum: 1
+          maximum: 5
+          example: 1
+        text:
+          type: string
+          description: Énoncé de la question.
+          minLength: 1
+        choices:
+          type: array
+          description: Liste des choix de réponse proposés.
+          minItems: 2
+          maxItems: 4
+          items:
+            type: string
+            minLength: 1
+
+    Player:
+      type: object
+      description: Informations de profil du joueur, fournies par le Hub.
+      additionalProperties: false
+      required:
+        - playerId
+        - pseudo
+        - level
+      properties:
+        playerId:
+          type: string
+          example: player_mock_001
+        pseudo:
+          type: string
+          example: ShadowRunner
+        level:
+          type: integer
+          minimum: 1
+          example: 1
+
+    HubSyncResult:
+      type: object
+      description: >
+        Résultat de la synchronisation du score avec le Hub, en fin de partie.
+        Vaut `null` tant que la partie est en cours.
+      nullable: true
+      additionalProperties: false
+      required:
+        - accepted
+        - xpGained
+      properties:
+        accepted:
+          type: boolean
+          description: Vrai si le Hub a accepté le score soumis.
+        xpGained:
+          type: integer
+          description: Points d'expérience attribués par le Hub.
+          minimum: 0
+          example: 12
+
+    GameState:
+      type: object
+      description: État courant du jeu renvoyé au démarrage d'une session.
+      additionalProperties: false
+      required:
+        - gameStatus
+        - currentLevel
+        - intersectionIndex
+        - totalIntersections
+        - score
+        - scoreMax
+        - errors
+        - maxErrors
+        - visualFeedback
+      properties:
+        gameStatus:
+          $ref: '#/components/schemas/GameStatus'
+        currentLevel:
+          type: integer
+          minimum: 1
+          maximum: 5
+        intersectionIndex:
+          type: integer
+          description: Index de l'intersection courante (base 0).
+          minimum: 0
+        totalIntersections:
+          type: integer
+          minimum: 1
+          example: 10
+        score:
+          type: integer
+          minimum: 0
+        scoreMax:
+          type: integer
+          minimum: 0
+          example: 1000
+        errors:
+          type: integer
+          minimum: 0
+          maximum: 6
+        maxErrors:
+          type: integer
+          minimum: 0
+          example: 6
+        visualFeedback:
+          $ref: '#/components/schemas/VisualFeedback'
+
+    PathHistoryEntry:
+      type: object
+      description: Une étape franchie dans le labyrinthe.
+      additionalProperties: false
+      required:
+        - intersectionIndex
+        - questionId
+        - chosenDirection
+        - isCorrect
+        - level
+        - pointsEarned
+        - timestamp
+      properties:
+        intersectionIndex:
+          type: integer
+          minimum: 0
+        questionId:
+          type: string
+          example: lvl1_q1
+        chosenDirection:
+          $ref: '#/components/schemas/Direction'
+        isCorrect:
+          type: boolean
+        level:
+          type: integer
+          minimum: 1
+          maximum: 5
+        pointsEarned:
+          type: integer
+          minimum: 0
+        timestamp:
+          type: string
+          format: date-time
+
+    StartGameRequest:
+      type: object
+      description: Corps de requête pour démarrer une session.
+      additionalProperties: false
+      required:
+        - fsq_token
+      properties:
+        fsq_token:
+          type: string
+          description: Jeton d'identification du joueur, émis par le Hub.
+          minLength: 1
+
+    StartGameResponse:
+      type: object
+      description: Réponse au démarrage d'une session.
+      additionalProperties: false
+      required:
+        - sessionId
+        - player
+        - gameState
+        - currentQuestion
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+        player:
+          $ref: '#/components/schemas/Player'
+        gameState:
+          $ref: '#/components/schemas/GameState'
+        currentQuestion:
+          $ref: '#/components/schemas/Question'
+
+    CurrentQuestionResponse:
+      type: object
+      description: Réponse à la ré-interrogation de la question courante.
+      additionalProperties: false
+      required:
+        - sessionId
+        - intersectionIndex
+        - totalIntersections
+        - currentLevel
+        - question
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+        intersectionIndex:
+          type: integer
+          minimum: 0
+        totalIntersections:
+          type: integer
+          minimum: 1
+        currentLevel:
+          type: integer
+          minimum: 1
+          maximum: 5
+        question:
+          $ref: '#/components/schemas/Question'
+
+    SubmitAnswerRequest:
+      type: object
+      description: >
+        Corps de requête pour soumettre une réponse. `answer` accepte soit
+        l'index du choix (0 à 3), soit le texte exact du choix.
+      additionalProperties: false
+      required:
+        - sessionId
+        - questionId
+        - answer
+        - chosenDirection
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+        questionId:
+          type: string
+          example: lvl1_q1
+        answer:
+          description: Index (0-3) ou texte exact du choix sélectionné.
+          oneOf:
+            - type: integer
+              minimum: 0
+              maximum: 3
+            - type: string
+              minLength: 1
+        chosenDirection:
+          $ref: '#/components/schemas/Direction'
+
+    SubmitAnswerResponse:
+      type: object
+      description: >
+        État du jeu après traitement d'une réponse. `nextDirection` et
+        `nextQuestion` valent `null` en fin de partie.
+      additionalProperties: false
+      required:
+        - isCorrect
+        - gameStatus
+        - score
+        - scoreMax
+        - currentLevel
+        - errors
+        - maxErrors
+        - visualFeedback
+        - nextDirection
+        - nextQuestion
+        - hubSyncResult
+      properties:
+        isCorrect:
+          type: boolean
+        gameStatus:
+          $ref: '#/components/schemas/GameStatus'
+        score:
+          type: integer
+          minimum: 0
+        scoreMax:
+          type: integer
+          minimum: 0
+        currentLevel:
+          type: integer
+          minimum: 1
+          maximum: 5
+        errors:
+          type: integer
+          minimum: 0
+          maximum: 6
+        maxErrors:
+          type: integer
+          minimum: 0
+        visualFeedback:
+          $ref: '#/components/schemas/VisualFeedback'
+        nextDirection:
+          oneOf:
+            - $ref: '#/components/schemas/Direction'
+            - type: 'null'
+          description: Direction vers l'intersection suivante, ou `null` en fin de partie.
+        nextQuestion:
+          oneOf:
+            - $ref: '#/components/schemas/Question'
+            - type: 'null'
+          description: Question suivante, ou `null` en fin de partie.
+        hubSyncResult:
+          $ref: '#/components/schemas/HubSyncResult'
+
+    GameStatusResponse:
+      type: object
+      description: Statut complet d'une session de jeu.
+      additionalProperties: false
+      required:
+        - sessionId
+        - playerId
+        - pseudo
+        - gameStatus
+        - currentLevel
+        - intersectionIndex
+        - totalIntersections
+        - score
+        - scoreMax
+        - errors
+        - maxErrors
+        - pathHistory
+        - visualFeedback
+        - hubSyncResult
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+        playerId:
+          type: string
+        pseudo:
+          type: string
+        gameStatus:
+          $ref: '#/components/schemas/GameStatus'
+        currentLevel:
+          type: integer
+          minimum: 1
+          maximum: 5
+        intersectionIndex:
+          type: integer
+          minimum: 0
+        totalIntersections:
+          type: integer
+          minimum: 1
+        score:
+          type: integer
+          minimum: 0
+        scoreMax:
+          type: integer
+          minimum: 0
+        errors:
+          type: integer
+          minimum: 0
+          maximum: 6
+        maxErrors:
+          type: integer
+          minimum: 0
+        pathHistory:
+          type: array
+          items:
+            $ref: '#/components/schemas/PathHistoryEntry'
+        visualFeedback:
+          $ref: '#/components/schemas/VisualFeedback'
+        hubSyncResult:
+          $ref: '#/components/schemas/HubSyncResult'
+
+    HealthStatus:
+      type: object
+      description: État de santé du service.
+      additionalProperties: false
+      required:
+        - status
+        - service
+        - timestamp
+      properties:
+        status:
+          type: string
+          example: OK
+        service:
+          type: string
+          example: Quizz_Hack Back-End Game API
+        timestamp:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      description: Format d'erreur standard de l'API.
+      additionalProperties: false
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: Code d'erreur stable, exploitable par le client.
+          example: VALIDATION_ERROR
+        message:
+          type: string
+          description: Message lisible décrivant l'erreur.
+          example: Le champ 'fsq_token' est requis.
+
+  responses:
+    BadRequest:
+      description: Requête invalide (payload ou paramètres malformés).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: VALIDATION_ERROR
+            message: Le champ 'fsq_token' est requis.
+    Unauthorized:
+      description: Jeton d'identification manquant ou invalide.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: INVALID_TOKEN
+            message: Le fsq_token fourni est invalide ou expiré.
+    NotFound:
+      description: Ressource introuvable (session ou question inconnue).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: SESSION_NOT_FOUND
+            message: Aucune session ne correspond à l'identifiant fourni.
