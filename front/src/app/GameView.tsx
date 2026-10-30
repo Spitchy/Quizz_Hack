@@ -5,14 +5,17 @@ import type { GameSnapshot } from '../game/types'
 import { generateCorridor } from '../maze/corridor'
 import { generateExitRoom, reachedDoor } from '../maze/exitRoom'
 import { generateMaze } from '../maze/generate'
+import { canReachRadio, radioSpot } from '../maze/radioSpot'
 import { entityDistanceMaps, nearestEntityDistance, signalStrength } from '../maze/physics'
 import { MazeScene, type PlayerInfo } from '../scene/MazeScene'
 import { readApiConfig } from '../api'
+import { playSound } from '../audio/engine'
 import { useSoundDirector } from '../audio/useSoundDirector'
 import { mockCorrectAnswer } from '../api/mock'
 import { directionFromTurn, readMazeLayout, readShowAnswers } from './config'
 import type { DefeatStage, VictoryStage } from './sequence'
 import { Hud } from './Hud'
+import { NewspaperOverlay } from './Newspaper'
 
 // Vue de jeu : labyrinthe 3D + HUD + saisie (déplacement, aborder une entité,
 // répondre sur son panneau). Chargée à la demande : c'est elle qui embarque Three.js.
@@ -60,6 +63,7 @@ export default function GameView({ game, snapshot, defeatStage, victoryStage, on
     return LAYOUT === 'corridor' ? generateCorridor(options) : generateMaze(options)
   }, [sessionId, totalIntersections])
   const distanceMaps = useMemo(() => entityDistanceMaps(maze), [maze])
+  const radio = useMemo(() => radioSpot(maze), [maze])
 
   const [near, setNear] = useState<number | null>(null)
   // Tuile du joueur (signal du HUD) en état ; son regard, lu seulement à la
@@ -72,6 +76,10 @@ export default function GameView({ game, snapshot, defeatStage, victoryStage, on
   const keyPick = pick && question && pick.questionId === question.id ? pick.choice : null
   const lastAnswerYaw = useRef<number | null>(null)
   const mouseLook = usePointerLocked()
+  const [paperOpen, setPaperOpen] = useState(false)
+  const canRead = phase === 'exploring' && !defeatStage && !victoryStage && canReachRadio(maze, radio, tile)
+  // S'il n'est plus à portée (la partie a pu changer), le journal se referme.
+  const reading = paperOpen && canRead
 
   const engage = useCallback((entity: number) => game.engage(entity), [game])
 
@@ -99,9 +107,19 @@ export default function GameView({ game, snapshot, defeatStage, victoryStage, on
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (phase === 'exploring') {
-        if (e.code === 'KeyE' && near !== null) {
+        if (reading) {
+          if (e.code === 'KeyE' || e.key === 'Escape') {
+            e.preventDefault()
+            playSound('paper', { gain: 0.5, rate: 0.9 })
+            setPaperOpen(false)
+          }
+        } else if (e.code === 'KeyE' && near !== null) {
           e.preventDefault()
           engage(near)
+        } else if (e.code === 'KeyE' && canRead) {
+          e.preventDefault()
+          playSound('paper', { gain: 0.6 })
+          setPaperOpen(true)
         }
         return
       }
@@ -126,7 +144,7 @@ export default function GameView({ game, snapshot, defeatStage, victoryStage, on
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [phase, question, near, engage, answer, keyPick, hover, game])
+  }, [phase, question, near, engage, answer, keyPick, hover, game, reading, canRead])
 
   const highlight =
     phase === 'question'
@@ -142,6 +160,8 @@ export default function GameView({ game, snapshot, defeatStage, victoryStage, on
     <>
       <MazeScene
         maze={maze}
+        radio={radio}
+        frozen={reading}
         exitRoom={EXIT_ROOM}
         snapshot={snapshot}
         defeatStage={defeatStage}
@@ -159,8 +179,10 @@ export default function GameView({ game, snapshot, defeatStage, victoryStage, on
         danger={toWorldState(snapshot).danger}
         signal={signalStrength(distance)}
         canEngage={phase === 'exploring' && near !== null}
+        canRead={canRead && near === null}
         mouseLook={mouseLook}
       />
+      {reading && <NewspaperOverlay />}
     </>
   )
 }

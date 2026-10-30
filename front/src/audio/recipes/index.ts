@@ -23,6 +23,7 @@ const recipe = (rate: number, render: Recipe['render'], variants = 1): Recipe =>
 /** Dans l'ordre de priorité : ce qui sert en premier est calculé en premier. */
 export const RECIPES = {
   'room-tone': recipe(LOW, ambience.roomTone),
+  paper: recipe(MID, events.paper),
   'old-noise': recipe(MID, ambience.oldNoise),
   'neon-buzz': recipe(MID, ambience.neonBuzz),
   'step-carpet': recipe(MID, events.stepCarpet, 4),

@@ -61,6 +61,8 @@ interface Graph {
   hazeLevel: GainNode
   /** Le vieux disque, lu en continu : jamais décodé d'un bloc. */
   song: HTMLAudioElement
+  /** Sortie de la radio, à brancher sur sa voix dans le monde. */
+  radio: GainNode
   /** Sons ponctuels en cours ou programmés : coupés nets au changement de moment. */
   active: Set<AudioBufferSourceNode>
 }
@@ -274,7 +276,10 @@ function buildGraph(ctx: AudioContext): Graph {
 
   // --- Le vieux disque : un pavillon de gramophone, de l'usure, et un plateau qui ondule. ---
   const music = gain(0, buses.ambience)
-  startLoop(ctx, 'old-noise', gain(0.45, music))
+  // La radio n'a pas de sortie ici : la scène la branche sur sa voix dans le monde.
+  const radio = gain(0)
+  const record = gain(1, music, radio)
+  startLoop(ctx, 'old-noise', gain(0.45, record))
   const song = new Audio(`${import.meta.env.BASE_URL}audio/${SOUNDTRACK}`)
   song.loop = true
   song.preload = 'auto'
@@ -303,7 +308,7 @@ function buildGraph(ctx: AudioContext): Graph {
   horn.connect(mouth)
   mouth.connect(worn)
   worn.connect(warble)
-  warble.connect(music)
+  warble.connect(record)
   void song.play().catch(() => {
     // Lecture refusée : le jeu continue sans la musique.
   })
@@ -355,6 +360,7 @@ function buildGraph(ctx: AudioContext): Graph {
     glitchBed: glitchBed.gain,
     wind: wind.gain,
     grass: grass.gain,
+    radio: radio.gain,
     music: music.gain,
     cctv: cctvWet.gain,
     crush: crushWet.gain,
@@ -384,6 +390,7 @@ function buildGraph(ctx: AudioContext): Graph {
     heartLevel,
     hazeLevel,
     song,
+    radio,
     active: new Set(),
   }
 }
@@ -523,7 +530,16 @@ export function unlockAudio(): void {
 
 /** Les nœuds dont la scène 3D a besoin pour y brancher ses sources. */
 export function audioNodes() {
-  return graph && { ctx: graph.ctx, neon: graph.neon, monsters: graph.monsters, spatialEffects: graph.spatialEffects }
+  return (
+    graph && {
+      ctx: graph.ctx,
+      neon: graph.neon,
+      monsters: graph.monsters,
+      spatialEffects: graph.spatialEffects,
+      radio: graph.radio,
+      ambience: graph.buses.ambience,
+    }
+  )
 }
 
 export function setDanger(value: number): void {
@@ -670,7 +686,7 @@ export function audioDebug() {
     scene: g.scene.gain.value,
     user: g.user.gain.value,
     muffle: g.muffle.frequency.value,
-    song: { paused: g.song.paused, time: g.song.currentTime, rate: g.song.playbackRate, ready: g.song.readyState, error: g.song.error?.code ?? null },
+    song: { element: g.song, paused: g.song.paused, time: g.song.currentTime, rate: g.song.playbackRate, ready: g.song.readyState, error: g.song.error?.code ?? null },
     layers,
     bank: bankStatus(),
     history: history.slice(),

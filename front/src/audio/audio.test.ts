@@ -87,18 +87,29 @@ describe('moments', () => {
   })
 })
 
-describe('le vieux disque', () => {
-  it('tourne dans le couloir, et jamais devant la caméra', () => {
-    expect(MIXES.corridor.levels.music).toBeGreaterThan(0)
-    for (const m of ['approach', 'beat', 'knockout', 'wake'] as const) expect(MIXES[m].levels.music ?? 0).toBe(0)
+describe('la radio et le vieux disque', () => {
+  const song = (m: Moment) => (MIXES[m].levels.music ?? 0) + (MIXES[m].levels.radio ?? 0)
+
+  it('vient de la radio dans le labyrinthe, pas de partout', () => {
+    expect(MIXES.corridor.levels.radio).toBeGreaterThan(0)
+    for (const m of ['corridor', 'reading', 'answering', 'reacting'] as const) expect(MIXES[m].levels.music ?? 0).toBe(0)
+  })
+
+  it('reste en fond : plus discrète que l\'ambiance de la pièce', () => {
+    expect(LAYER_TRIM.radio).toBeLessThanOrEqual(0.3)
+    expect(LAYER_TRIM.music).toBeLessThanOrEqual(0.2)
+  })
+
+  it('ne joue jamais devant la caméra', () => {
+    for (const m of ['approach', 'beat', 'knockout', 'wake'] as const) expect(song(m)).toBe(0)
   })
 
   it('se tait dès la lumière de la victoire', () => {
-    for (const m of ['whiteout', 'room', 'door', 'through', 'outside'] as const) expect(MIXES[m].levels.music ?? 0).toBe(0)
+    for (const m of ['whiteout', 'room', 'door', 'through', 'outside'] as const) expect(song(m)).toBe(0)
   })
 
   it('presque muet juste avant le verdict', () => {
-    expect(MIXES.answering.levels.music!).toBeLessThan(MIXES.corridor.levels.music! * 0.2)
+    expect(MIXES.answering.levels.radio!).toBeLessThan(MIXES.corridor.levels.radio! * 0.2)
   })
 
   it('ralentit quand tout s\'effondre', () => {

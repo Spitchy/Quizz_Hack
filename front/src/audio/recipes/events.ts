@@ -340,6 +340,20 @@ export function gasp(rate: number, random: Random): Samples {
   return normalize(fadeEdges(out, rate, 0.005, 0.03))
 }
 
+/** Le journal qu'on prend ou qu'on repose : du papier sec qui froisse. */
+export function paper(rate: number, random: Random): Samples {
+  const seconds = 0.42
+  const out = alloc(seconds, rate)
+  const body = new Biquad('bandpass', 3400, 0.7, rate)
+  const crinkle = drift(random, seconds, 0.012)
+  for (let i = 0; i < out.length; i++) {
+    const t = i / rate
+    const grain = Math.max(0, crinkle(t))
+    out[i] = body.tick(random() * 2 - 1) * grain * grain * bell(t / seconds) ** 0.5
+  }
+  return normalize(fadeEdges(out, rate, 0.004, 0.03))
+}
+
 // --- Le rire du médecin (voix de synthèse, étouffée par le masque) --------------
 
 interface Syllable {

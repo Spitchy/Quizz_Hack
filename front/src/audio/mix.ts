@@ -60,7 +60,9 @@ export type Layer =
   | 'glitchBed'
   | 'wind'
   | 'grass'
-  /** Le vieux disque et son bruit de fond. */
+  /** La radio, posée dans le labyrinthe : le son vient d'elle. */
+  | 'radio'
+  /** La même musique, entendue de nulle part (hors du labyrinthe). */
   | 'music'
   /** Fondu vers le micro de caméra de surveillance. */
   | 'cctv'
@@ -83,6 +85,7 @@ export const LAYERS: readonly Layer[] = [
   'glitchBed',
   'wind',
   'grass',
+  'radio',
   'music',
   'cctv',
   'crush',
@@ -104,7 +107,8 @@ export const LAYER_TRIM: Record<Layer, number> = {
   glitchBed: 0.3,
   wind: 0.5,
   grass: 0.16,
-  music: 0.38,
+  radio: 0.15,
+  music: 0.16,
   cctv: 1,
   crush: 1,
   gate: 1,
@@ -138,32 +142,32 @@ const OPEN_EARS = 18000
 export const MIXES: Record<Moment, MomentMix> = {
   silent: { levels: {}, fade: 0.25 },
   corridor: {
-    levels: { roomTone: 0.5, neon: 0.8, drone: 1, heartbeat: 1, monsters: 1, haze: 1, music: 0.6 },
+    levels: { roomTone: 0.5, neon: 0.8, drone: 1, heartbeat: 1, monsters: 1, haze: 1, radio: 1 },
     fade: 0.9,
     room: 'corridor',
   },
   reading: {
-    levels: { roomTone: 0.32, neon: 0.45, drone: 0.8, heartbeat: 1, monsters: 0.75, haze: 0.8, music: 0.42 },
+    levels: { roomTone: 0.32, neon: 0.45, drone: 0.8, heartbeat: 1, monsters: 0.75, haze: 0.8, radio: 0.7 },
     fade: 0.7,
     room: 'corridor',
   },
   answering: {
-    levels: { roomTone: 0.1, neon: 0.1, drone: 0.2, heartbeat: 0.5, monsters: 0.15, music: 0.06 },
+    levels: { roomTone: 0.1, neon: 0.1, drone: 0.2, heartbeat: 0.5, monsters: 0.15, radio: 0.12 },
     fade: 0.09,
     room: 'corridor',
   },
   reacting: {
-    levels: { roomTone: 0.4, neon: 0.6, drone: 1, heartbeat: 1, monsters: 1, haze: 1, music: 0.35 },
+    levels: { roomTone: 0.4, neon: 0.6, drone: 1, heartbeat: 1, monsters: 1, haze: 1, radio: 0.55 },
     fade: 0.5,
     room: 'corridor',
   },
   // Les néons meurent : il ne reste que le cœur, dans un quasi-silence.
   freeze: {
-    levels: { roomTone: 0.06, heartbeat: 1, music: 0.5 },
+    levels: { roomTone: 0.06, heartbeat: 1, radio: 0.8 },
     fade: 0.2,
     room: 'corridor',
-    // Le disque ralentit avec le courant, puis s'éteint.
-    timeline: [{ at: 0.45, target: 'music', to: 0, fade: 0.3 }],
+    // La radio ralentit avec le courant, puis s'éteint.
+    timeline: [{ at: 0.45, target: 'radio', to: 0, fade: 0.3 }],
   },
   // Coupe sur la caméra : tout passe d'un coup par son mauvais micro.
   approach: {

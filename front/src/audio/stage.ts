@@ -1,6 +1,7 @@
 import { AudioContext as ThreeAudioContext, AudioListener, PositionalAudio, type Camera } from 'three'
 import { neonIntensity } from '../scene/flicker'
 import type { Maze } from '../maze/generate'
+import type { Vec2 } from '../maze/physics'
 import { TILE_SIZE } from '../maze/generate'
 import type { Archetype } from '../scene/entities/archetypes'
 import type { CuePoint } from './cues'
@@ -22,6 +23,7 @@ const SHOT_VOICES = 14
 const NEON_RANGE = 14
 const MONSTER_RANGE = 22
 const NEON_HEIGHT = 2.75
+const RADIO_HEIGHT = 1
 /** Tous les combien réattribuer les voix et recalculer les murs (s). */
 const RESCAN = 0.14
 /** Une entité qui ne donne plus de nouvelles (autre monde) se tait, sans couper sur un simple à-coup (s). */
@@ -73,6 +75,7 @@ interface Stage {
   neons: NeonVoice[]
   monsters: MonsterVoice[]
   shots: ShotVoice[]
+  radio: Voice
   rescanAt: number
   dispose: () => void
 }
@@ -143,6 +146,10 @@ export function createSoundStage(camera: Camera): () => void {
     freeAt: 0,
   }))
   for (const shot of shots) shot.level.gain.value = 1
+  // Assez loin pour l'entendre de loin, mais elle ne remplit le couloir qu'à côté d'elle.
+  const radio = createVoice(listener, nodes.ambience, 'equalpower', 3, 0.8)
+  radio.level.gain.value = 1
+  nodes.radio.connect(radio.input)
 
   // Une boucle de bourdonnement par voix de néon, à des décalages différents.
   let buzzStarted = false
@@ -166,11 +173,13 @@ export function createSoundStage(camera: Camera): () => void {
     neons,
     monsters,
     shots,
+    radio,
     rescanAt: 0,
     startBuzz,
     dispose: () => {
       camera.remove(listener)
-      for (const voice of [...neons, ...monsters, ...shots]) {
+      nodes.radio.disconnect()
+      for (const voice of [...neons, ...monsters, ...shots, radio]) {
         voice.level.disconnect()
         voice.audio.panner.disconnect()
         voice.audio.gain.disconnect()
@@ -218,7 +227,7 @@ function assignMonster(voice: MonsterVoice, id: number, entity: LiveEntity, ctx:
 }
 
 /** À chaque image : place les voix, suit les néons, réattribue de temps en temps. */
-export function updateSoundStage(maze: Maze | null, camera: Camera, time: number, danger: number, dark: boolean, surge: number): void {
+export function updateSoundStage(maze: Maze | null, radio: Vec2 | null, camera: Camera, time: number, danger: number, dark: boolean, surge: number): void {
   const s = stage as (Stage & { startBuzz: () => void }) | null
   if (!s) return
   s.startBuzz()
@@ -229,6 +238,18 @@ export function updateSoundStage(maze: Maze | null, camera: Camera, time: number
   // Réattribution des voix : pas à chaque image.
   const rescan = time >= s.rescanAt || time < s.rescanAt - RESCAN * 2
   if (rescan) s.rescanAt = time + RESCAN
+
+  // --- Radio : elle ne bouge pas, seuls les murs changent. ---
+  if (rescan) {
+    if (radio && maze) {
+      place(s.radio, radio.x, RADIO_HEIGHT, radio.z, now)
+      const { cutoff, gain } = occlusionFor(wallDepth(maze, here, radio))
+      s.radio.filter.frequency.setTargetAtTime(cutoff, now, 0.12)
+      s.radio.input.gain.setTargetAtTime(gain, now, 0.12)
+    } else {
+      s.radio.input.gain.setTargetAtTime(0, now, 0.05)
+    }
+  }
 
   // --- Néons ---
   if (rescan && maze) {
@@ -319,6 +340,7 @@ export function soundStageDebug() {
   return {
     neons: stage.neons.map((v) => ({ light: v.light, level: v.lastLevel, gain: v.level.gain.value, cutoff: v.filter.frequency.value, x: v.audio.panner.positionX.value, z: v.audio.panner.positionZ.value })),
     monsters: stage.monsters.map((v) => ({ entity: v.entity, bed: v.bed, gain: v.level.gain.value, cutoff: v.filter.frequency.value, x: v.audio.panner.positionX.value, z: v.audio.panner.positionZ.value })),
+    radio: { gain: stage.radio.input.gain.value, cutoff: stage.radio.filter.frequency.value, x: stage.radio.audio.panner.positionX.value, z: stage.radio.audio.panner.positionZ.value },
     listener: { x: stage.listener.context.listener.positionX.value, z: stage.listener.context.listener.positionZ.value },
   }
 }
