@@ -19,7 +19,7 @@ export function TitleScreen({ onEnter }: TitleScreenProps) {
       <button ref={prompt} type="button" className="prompt" onClick={onEnter}>
         [ ENTRER ]
       </button>
-      <p className="terminal dim">plein écran · [souris] viser · [1-4] répondre</p>
+      <p className="terminal dim">plein écran · [souris] viser · [1-4] répondre · [M] son</p>
     </div>
   )
 }

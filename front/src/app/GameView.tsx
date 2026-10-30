@@ -8,6 +8,7 @@ import { generateMaze } from '../maze/generate'
 import { entityDistanceMaps, nearestEntityDistance, signalStrength } from '../maze/physics'
 import { MazeScene, type PlayerInfo } from '../scene/MazeScene'
 import { readApiConfig } from '../api'
+import { useSoundDirector } from '../audio/useSoundDirector'
 import { mockCorrectAnswer } from '../api/mock'
 import { directionFromTurn, readMazeLayout, readShowAnswers } from './config'
 import type { DefeatStage, VictoryStage } from './sequence'
@@ -52,6 +53,7 @@ function usePointerLocked(): boolean {
 
 export default function GameView({ game, snapshot, defeatStage, victoryStage, onReachDoor }: GameViewProps) {
   const { question, phase, sessionId, totalIntersections } = snapshot
+  useSoundDirector(snapshot, defeatStage, victoryStage)
   // Le même sessionId redonne le même labyrinthe : une partie reprise retrouve ses lieux.
   const maze = useMemo(() => {
     const options = { seed: sessionId ?? 'local', entityCount: Math.max(1, totalIntersections) }

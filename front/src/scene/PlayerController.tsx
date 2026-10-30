@@ -2,6 +2,9 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useRef } from 'react'
 import { Color, Vector3, type PointLight } from 'three'
 import { CCTV_STAGES, type DefeatStage } from '../app/sequence'
+import { playSound } from '../audio/engine'
+import { advanceStride, createStride } from '../audio/footsteps'
+import { pinNeon } from '../audio/stage'
 import { isFloor, tileAt, tileCenter, type Maze, type Tile } from '../maze/generate'
 import { moveWithCollisions, type Circle, type Vec2 } from '../maze/physics'
 import { neonFlicker } from './flicker'
@@ -51,6 +54,8 @@ interface PlayerControllerProps {
   autoWalk?: boolean
   /** Victoire : la lumière envahit tout, le regard s'élève. */
   dazzled?: boolean
+  /** Ce qu'il a sous les pieds : la moquette, ou le sol nu de la pièce blanche. */
+  surface?: 'carpet' | 'hard'
 }
 
 const WALK_SPEED = 2.8
@@ -88,7 +93,7 @@ function lineOfSight(maze: Maze, a: Vec2, b: Vec2): boolean {
 }
 
 export function PlayerController(props: PlayerControllerProps) {
-  const { maze, readingEntity, canMove, lightsOff, shake, defeat = null, autoWalk = false, dazzled = false } = props
+  const { maze, readingEntity, canMove, lightsOff, shake, defeat = null, autoWalk = false, dazzled = false, surface = 'carpet' } = props
   const gl = useThree((state) => state.gl)
   const halo = useRef<PointLight>(null)
 
@@ -103,6 +108,7 @@ export function PlayerController(props: PlayerControllerProps) {
   const transition = useRef<{ from: typeof pose.current; startedAt: number | null; entity: number } | null>(null)
   const trauma = useRef(0)
   const bob = useRef(0)
+  const stride = useRef(createStride())
   // Dans le noir de la défaite, le joueur lève les yeux vers les silhouettes qui l'entourent.
   const lookUp = useRef(0)
   const near = useRef<number | null>(null)
@@ -205,6 +211,8 @@ export function PlayerController(props: PlayerControllerProps) {
     const t = clock.elapsedTime
     const { entities, obstacles, isEngageable, danger, onNearEntity, onPlayerMoved } = latest.current
     const p = pose.current
+    const fromX = p.x
+    const fromZ = p.z
     let moved = 0
 
     const reading = transition.current
@@ -294,6 +302,15 @@ export function PlayerController(props: PlayerControllerProps) {
       onNearEntity(null)
     }
 
+    // Un pas par foulée vraiment parcourue : contre un mur ou à l'arrêt, rien ne sonne.
+    const running = keys.current.has('ShiftLeft') || keys.current.has('ShiftRight')
+    if (advanceStride(stride.current, Math.hypot(p.x - fromX, p.z - fromZ), dt, running)) {
+      playSound(surface === 'hard' ? 'step-hard' : 'step-carpet', {
+        gain: (surface === 'hard' ? 0.32 : 0.5) * (running ? 1.25 : 1),
+        rate: (stride.current.foot ? 0.97 : 1.03) * (running ? 1.06 : 1),
+      })
+    }
+
     // Position signalée au HUD (signal, direction) seulement quand elle change vraiment.
     const tile = tileAt(p.x, p.z)
     const key = `${tile.x},${tile.y}`
@@ -331,7 +348,9 @@ export function PlayerController(props: PlayerControllerProps) {
       // Le dernier néon qui tient encore, juste au-dessus de lui, et qui grésille.
       halo.current.position.set(defeat.stand.x, 2.3, defeat.stand.z)
       halo.current.color.copy(NEON)
-      halo.current.intensity = HALO_INTENSITY * 1.25 * (0.35 + 0.65 * neonFlicker(t, 0.7, 3))
+      const flicker = neonFlicker(t, 0.7, 3)
+      halo.current.intensity = HALO_INTENSITY * 1.25 * (0.35 + 0.65 * flicker)
+      pinNeon(defeat.stand.x, 2.3, defeat.stand.z, flicker)
     } else if (halo.current) {
       camera.getWorldDirection(forward)
       halo.current.position.copy(camera.position).addScaledVector(forward, 0.4)

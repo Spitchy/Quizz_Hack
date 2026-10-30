@@ -2,6 +2,7 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react'
 import { Color, MeshBasicMaterial, MeshStandardMaterial, Vector3, type Group } from 'three'
 import { APPROACH_SECONDS, type DefeatStage } from '../app/sequence'
+import { playEntityStep, reportEntity } from '../audio/stage'
 import type { EntityRender } from '../game/render'
 import { pathLength, pointAlong, type ApproachPlan } from '../maze/approach'
 import type { Archetype, EntityLook } from './entities/archetypes'
@@ -79,6 +80,8 @@ interface EntityProps {
   defeat?: DefeatRole | null
   /** Victoire : silhouette translucide qui laisse passer le joueur. */
   ghost?: boolean
+  /** Identifiant pour le son : sans lui, l'entité est muette (les ombres de la pièce blanche). */
+  soundId?: number
   sign: ReactNode
 }
 
@@ -96,6 +99,7 @@ export function Entity({
   reaction = 'none',
   defeat = null,
   ghost = false,
+  soundId,
   sign,
 }: EntityProps) {
   const root = useRef<Group>(null)
@@ -134,6 +138,7 @@ export function Entity({
     approachStart: 0,
     beatStart: 0,
     walked: 0,
+    footfall: 0,
     placed: false,
     springs: {
       look: { value: 0, velocity: 0 },
@@ -162,6 +167,7 @@ export function Entity({
       if (st.wasVisible && !cloud) setCloud(sampleCloud(b, r, ghost ? '#6f6a61' : look.palette.body, ghost ? 0 : 0.3))
       st.wasVisible = false
       b.visible = false
+      if (soundId !== undefined) reportEntity(soundId, look.archetype, r.position.x, r.position.z, 'calm', false, t)
       return
     }
     st.wasVisible = true
@@ -206,6 +212,12 @@ export function Entity({
       const speed = Math.max(0, dist - st.walked) / Math.max(dt, 1e-3)
       walking = Math.min(1, speed / 0.6)
       m.walkPhase += Math.max(0, dist - st.walked) * 3.2
+      // Un pied touche le sol à chaque demi-cycle de marche.
+      const footfall = Math.floor(m.walkPhase / Math.PI)
+      if (footfall !== st.footfall) {
+        st.footfall = footfall
+        if (soundId !== undefined) playEntityStep(look.archetype, r.position.x, r.position.z)
+      }
       st.walked = dist
       const at = pointAlong(path, dist)
       r.position.set(at.x, 0, at.z)
@@ -217,6 +229,7 @@ export function Entity({
       st.walked = 0
       r.position.set(position[0], 0, position[2])
     }
+    if (soundId !== undefined) reportEntity(soundId, look.archetype, r.position.x, r.position.z, m.mood, true, t)
     m.walk = damp(sp.walk, walking, 0.18, dt)
     // Rotation amortie, par le plus court chemin.
     if (!st.placed) sp.heading.value = heading

@@ -12,6 +12,7 @@ import {
   type MeshBasicMaterial,
 } from 'three'
 import type { DefeatStage } from '../app/sequence'
+import { playAt } from '../audio/stage'
 import { pathLength, pointAlong } from '../maze/approach'
 import { clamp01, damp, ease, smoothNoise } from './entities/anim'
 import { Arm, Ball, Limb } from './entities/parts'
@@ -129,7 +130,7 @@ export function Doctor({ stage }: { stage: DefeatStage }) {
   const syringe = useRef<Group>(null)
   const liquid = useRef<Mesh>(null)
   const eyeGlow = useRef<MeshBasicMaterial>(null)
-  const st = useRef({ stage: null as DefeatStage | null, at: 0, phase: 0, yaw: { value: Math.PI, velocity: 0 }, lean: { value: 0, velocity: 0 } })
+  const st = useRef({ stage: null as DefeatStage | null, at: 0, phase: 0, footfall: 0, yaw: { value: Math.PI, velocity: 0 }, lean: { value: 0, velocity: 0 } })
 
   useFrame(({ clock, camera }, rawDt) => {
     const r = root.current
@@ -178,6 +179,12 @@ export function Doctor({ stage }: { stage: DefeatStage }) {
 
     // Démarche raide, genoux qui plient ; fou rire qui secoue les épaules.
     s.phase += dt * 7 * walk
+    // Ses semelles sur le carrelage : un pas à chaque demi-cycle de sa démarche.
+    const footfall = Math.floor(s.phase / Math.PI)
+    if (footfall !== s.footfall) {
+      s.footfall = footfall
+      playAt('step-hard', [r.position.x, 0.05, r.position.z], { gain: 0.9, rate: 0.82 + Math.random() * 0.08 })
+    }
     const step = Math.sin(s.phase) * 0.5 * walk
     legL.current?.rotation.set(step, 0, 0)
     legR.current?.rotation.set(-step, 0, 0)

@@ -13,6 +13,7 @@ import {
   type Texture,
 } from 'three'
 import type { DefeatStage } from '../app/sequence'
+import { pinNeon } from '../audio/stage'
 import { Doctor } from './Doctor'
 import { clamp01, ease } from './entities/anim'
 import { neonFlicker } from './flicker'
@@ -180,6 +181,8 @@ export function WakeRoom({ stage, score }: { stage: DefeatStage; score: WakeScor
       bulb.current.intensity = 3.2 * k
       bulb.current.color.copy(infected ? sick : warm)
     }
+    // Ampoule fatiguée : elle bourdonne au rythme de ses coupures.
+    pinNeon(0, 2.42, 0.5, k)
     const glow = bulbGlow.current?.material
     if (glow && 'color' in glow) (glow.color as Color).copy(infected ? sick : warm).multiplyScalar(1.5 * k)
     if (door.current && corridor.current) swingDoor(door.current, corridor.current, doorOpening(stage, t - started.current.at), t)

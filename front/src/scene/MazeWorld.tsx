@@ -10,7 +10,7 @@ import {
 } from 'three'
 import { TILE_SIZE, ZONES, type Maze } from '../maze/generate'
 import { buildWallMeshes, type MeshData } from '../maze/mesh'
-import { neonFlicker } from './flicker'
+import { neonIntensity } from './flicker'
 import { CORRIDOR_HEIGHT, PALETTE } from './layout'
 import { carpetTexture, ceilingTexture, lightPoolTexture, wallpaperTexture } from './textures'
 
@@ -105,9 +105,7 @@ export function MazeWorld({ maze, danger, dark, surge = 0 }: MazeWorldProps) {
   useFrame(({ clock }) => {
     const t = clock.elapsedTime
     maze.lights.forEach((light, i) => {
-      // Néon défaillant : coupures très fréquentes et intensité réduite.
-      const flicker = light.broken ? neonFlicker(t, 1, i) * 0.55 : neonFlicker(t, danger, i)
-      const k = dark ? 0 : flicker + (1 + surge * 3 - flicker) * surge
+      const k = neonIntensity(light, i, t, danger, dark, surge)
       panels.current?.setColorAt(i, color.copy(PANEL_COLOR).multiplyScalar(k))
       pools.current?.setColorAt(i, color.copy(POOL_COLOR).multiplyScalar(k))
     })

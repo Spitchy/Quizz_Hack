@@ -22,6 +22,7 @@ import { PlayerBody } from './PlayerBody'
 import { SecurityCamera } from './SecurityCamera'
 import { PlayerController, type EntityPose, type PlayerInfo } from './PlayerController'
 import { Sign } from './Sign'
+import { SoundStage } from './SoundStage'
 import { WakeRoom } from './WakeRoom'
 import { WhiteRoom, type FreedEntity } from './WhiteRoom'
 
@@ -107,11 +108,12 @@ interface EntitySlotProps {
  * change (celle qu'on lit, celle qui réagit) se re-rend.
  */
 const EntitySlot = memo(function EntitySlot(props: EntitySlotProps) {
-  const { look, x, z, yaw, mood, visible, smileOnly, engaged, reaction, defeat } = props
+  const { id, look, x, z, yaw, mood, visible, smileOnly, engaged, reaction, defeat } = props
   const render = useMemo(() => ({ mood, visible, smileOnly }), [mood, visible, smileOnly])
   const position = useMemo<[number, number, number]>(() => [x, 0, z], [x, z])
   return (
     <Entity
+      soundId={id}
       render={render}
       look={look}
       position={position}
@@ -312,6 +314,7 @@ function SceneContents(props: MazeSceneProps) {
       <>
         <PlayerController
           key="exit-room"
+          surface="hard"
           maze={exitRoom.maze}
           entities={NO_ENTITIES}
           obstacles={NO_OBSTACLES}
@@ -335,6 +338,7 @@ function SceneContents(props: MazeSceneProps) {
 }
 
 export function MazeScene(props: MazeSceneProps) {
+  const world = toWorldState(props.snapshot)
   return (
     <Canvas
       dpr={DPR_CEILING}
@@ -344,6 +348,12 @@ export function MazeScene(props: MazeSceneProps) {
     >
       <AdaptiveDpr />
       <DevSceneHook />
+      <SoundStage
+        maze={worldFor(props.defeatStage, props.victoryStage) === 'maze' ? props.maze : null}
+        danger={world.danger}
+        dark={world.lightsOff}
+        surge={props.victoryStage === 'release' ? 1 : 0}
+      />
       <SceneContents {...props} />
     </Canvas>
   )
