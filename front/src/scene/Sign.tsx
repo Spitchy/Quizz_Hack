@@ -1,7 +1,10 @@
 import { useFrame, type ThreeEvent } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
-import { CanvasTexture, PlaneGeometry, SRGBColorSpace, type Group } from 'three'
+import { CanvasTexture, PlaneGeometry, SRGBColorSpace, Vector3, type Group, type Mesh, type Object3D } from 'three'
 import type { Question } from '../api/client'
+import type { Maze } from '../maze/generate'
+import { createDebris, isOpen, launchDebris, seatDebris, stepDebris, type Debris } from './entities/signDebris'
+import { BREAK_RELEASE, ramp, type SignBreak } from './entities/signBreak'
 import { choiceAt } from './signLayout'
 import { drawSignBase, drawSignHighlight, SIGN_BOX, SIGN_FALLBACK_FONT, SIGN_FONT, signContext, type SignBase } from './textures'
 import { useFontReady } from './useFontReady'
@@ -13,6 +16,10 @@ interface SignProps {
   question: Question | null
   showQuestion: boolean
   broken: boolean
+  /** Le geste de ce monstre quand il le détruit. */
+  breakStyle?: SignBreak
+  /** Pour que les morceaux rebondissent sur les murs au lieu de les traverser. */
+  maze?: Maze
   highlight: number | null
   /** Mode test (mock) : bonne réponse cochée. Le vrai back ne la donne jamais. */
   answer?: number | null
@@ -101,7 +108,140 @@ function halfGeometry(side: 0 | 1): PlaneGeometry {
   return geometry
 }
 
-export function Sign({ question, showQuestion, broken, highlight, answer = null, onHover, onPick }: SignProps) {
+interface SignParts {
+  whole: Group | null
+  leftEdge: Group | null
+  rightEdge: Group | null
+  left: Group | null
+  right: Group | null
+  ball: Mesh | null
+}
+
+interface BreakState {
+  since: number | null
+  style: SignBreak
+  launched: boolean
+  whole: Debris
+  left: Debris
+  right: Debris
+  ball: Debris
+}
+
+const createBreakState = (): BreakState => ({
+  since: null,
+  style: 'snap',
+  launched: false,
+  whole: createDebris(0.03, 0.66, 0.5),
+  left: createDebris(0.025, 0.66, -0.7),
+  right: createDebris(0.035, 0.66, 2.1),
+  ball: createDebris(0.11, 0.12, null),
+})
+
+const forward = new Vector3()
+const lateral = new Vector3()
+const velocity = new Vector3()
+const spin = new Vector3()
+
+/** Vers où il peut jeter sans viser un mur : l'axe du panneau et le côté le plus dégagé. */
+function aimFrom(part: Object3D, maze: Maze | undefined): number {
+  part.getWorldDirection(forward)
+  forward.y = 0
+  forward.normalize()
+  lateral.set(forward.z, 0, -forward.x)
+  part.getWorldPosition(velocity)
+  return isOpen(maze, velocity.x + lateral.x, velocity.z + lateral.z, 0.3) ? 1 : -1
+}
+
+/** Un morceau par côté, qui part de son côté. */
+function launchHalves(s: BreakState, parts: SignParts, maze: Maze | undefined, spread: number, up: number, ahead: number) {
+  const { leftEdge, rightEdge } = parts
+  if (!leftEdge || !rightEdge) return
+  aimFrom(leftEdge, maze)
+  launchDebris(s.left, leftEdge, velocity.copy(lateral).multiplyScalar(spread).addScaledVector(forward, ahead).setY(up), spin.set(3, -5, 4))
+  launchDebris(s.right, rightEdge, velocity.copy(lateral).multiplyScalar(-spread).addScaledVector(forward, ahead).setY(up * 0.85), spin.set(-4, 6, -3))
+}
+
+/** Une image de la destruction du panneau (hors rendu React). */
+function animateBreak(s: BreakState, parts: SignParts, dt: number, maze: Maze | undefined) {
+  const { whole, left, right, ball, leftEdge, rightEdge } = parts
+  if (s.since === null || !whole || !left || !right || !leftEdge || !rightEdge || !ball) return
+  s.since += dt
+  const t = s.since
+  const release = BREAK_RELEASE[s.style]
+  const due = release !== null && t >= release && !s.launched
+
+  switch (s.style) {
+    case 'snap': {
+      // Il se rompt d'un coup, et chaque moitié pivote autour de la main qui la tient.
+      const k = Math.min(1, t * 5)
+      const e = 1 - (1 - k) ** 3
+      left.rotation.set(0.3 * e, -0.15 * e, 0.7 * e)
+      left.position.y = -0.05 * e
+      right.rotation.set(0.4 * e, 0.2 * e, -0.85 * e)
+      right.position.y = -0.08 * e
+      break
+    }
+    case 'throw':
+      if (due) {
+        const side = aimFrom(whole, maze)
+        velocity.copy(forward).multiplyScalar(2.3).addScaledVector(lateral, side * 1.9).setY(2.3)
+        launchDebris(s.whole, whole, velocity, spin.set(5, 8, 3.5))
+      }
+      break
+    case 'tear': {
+      // Il tire : la déchirure s'ouvre à partir du milieu.
+      const k = ramp(0.05, 0.5, t)
+      left.rotation.set(0.1 * k, 0, 0.32 * k)
+      right.rotation.set(-0.1 * k, 0, -0.26 * k)
+      if (due) launchHalves(s, parts, maze, 1.7, 1.5, 0.7)
+      break
+    }
+    case 'smash':
+      if (due) {
+        // Il l'abat : les deux moitiés éclatent, à peine au-dessus du sol.
+        left.rotation.set(0.4, 0, 0.5)
+        right.rotation.set(-0.3, 0, -0.5)
+        launchHalves(s, parts, maze, 2.1, 1.1, 1)
+      }
+      break
+    case 'crumple': {
+      const k = ramp(0.02, 0.55, t)
+      whole.scale.set(1 - 0.93 * k, 1 - 0.88 * k, 1)
+      whole.rotation.z = Math.sin(t * 38) * 0.14 * k
+      whole.rotation.x = Math.sin(t * 31) * 0.1 * k
+      whole.visible = k < 0.97
+      ball.visible = k > 0.3
+      if (!s.launched) ball.scale.setScalar(0.125 * ramp(0.25, 0.6, t))
+      if (due) {
+        const side = aimFrom(ball, maze)
+        velocity.copy(forward).multiplyScalar(1.35).addScaledVector(lateral, side * 0.75).setY(0.5)
+        launchDebris(s.ball, ball, velocity, spin.set(7, 3, 5))
+      }
+      break
+    }
+    case 'devour': {
+      const k = ramp(0.1, 0.85, t)
+      whole.scale.setScalar(Math.max(0.001, 1 - k))
+      whole.rotation.z = Math.sin(t * 26) * 0.2 * k
+      whole.visible = k < 0.99
+      break
+    }
+  }
+  if (due) s.launched = true
+
+  for (const [debris, part] of [
+    [s.whole, whole],
+    [s.left, leftEdge],
+    [s.right, rightEdge],
+    [s.ball, ball],
+  ] as const) {
+    if (!debris.active) continue
+    stepDebris(debris, Math.min(dt, 0.05), maze)
+    seatDebris(debris, part)
+  }
+}
+
+export function Sign({ question, showQuestion, broken, breakStyle = 'snap', maze, highlight, answer = null, onHover, onPick }: SignProps) {
   const fontReady = useFontReady(`48px ${SIGN_FONT}`)
   const font = fontReady ? SIGN_FONT : SIGN_FALLBACK_FONT
 
@@ -116,25 +256,25 @@ export function Sign({ question, showQuestion, broken, highlight, answer = null,
 
   const left = useRef<Group>(null)
   const right = useRef<Group>(null)
+  const whole = useRef<Group>(null)
+  const leftEdge = useRef<Group>(null)
+  const rightEdge = useRef<Group>(null)
+  const ball = useRef<Mesh>(null)
   const halves = useMemo(() => [halfGeometry(0), halfGeometry(1)] as const, [])
   useEffect(() => () => halves.forEach((g) => g.dispose()), [halves])
 
-  // Rupture : chaque moitié pivote autour de la main qui la tient et pend.
-  const breakProgress = useRef(broken ? 1 : 0)
+  // Rupture : le geste de ce monstre. Un panneau déjà brisé au montage (partie
+  // reprise) reste simplement cassé en deux entre ses mains.
+  const brokenAtMount = useRef(broken)
+  const breaking = useRef(createBreakState())
   useFrame((_, dt) => {
-    const target = broken ? 1 : 0
-    // Brisure brutale, réparation instantanée (nouvelle entité).
-    breakProgress.current = target === 0 ? 0 : Math.min(1, breakProgress.current + dt * 5)
-    const k = breakProgress.current
-    const ease = 1 - (1 - k) ** 3
-    if (left.current) {
-      left.current.rotation.set(0.3 * ease, -0.15 * ease, 0.7 * ease)
-      left.current.position.y = -0.05 * ease
+    const s = breaking.current
+    if (!broken) return
+    if (s.since === null) {
+      s.since = brokenAtMount.current ? 1 : 0
+      s.style = brokenAtMount.current ? 'snap' : breakStyle
     }
-    if (right.current) {
-      right.current.rotation.set(0.4 * ease, 0.2 * ease, -0.85 * ease)
-      right.current.position.y = -0.08 * ease
-    }
+    animateBreak(s, { whole: whole.current, leftEdge: leftEdge.current, rightEdge: rightEdge.current, left: left.current, right: right.current, ball: ball.current }, dt, maze)
   })
 
   const toChoice = (e: ThreeEvent<PointerEvent | MouseEvent>) => {
@@ -155,8 +295,14 @@ export function Sign({ question, showQuestion, broken, highlight, answer = null,
 
   return (
     <group>
+      {/* Le panneau écrasé en boule : invisible tant qu'il n'a pas servi. */}
+      <mesh ref={ball} visible={false} scale={0.001}>
+        <icosahedronGeometry args={[1, 1]} />
+        <meshStandardMaterial map={texture} roughness={0.85} />
+      </mesh>
+      <group ref={whole}>
       {/* Pivot sur le bord extérieur de chaque moitié (là où sont les mains). */}
-      <group position={[-halfWidth, 0, 0]}>
+      <group ref={leftEdge} position={[-halfWidth, 0, 0]}>
         <group ref={left}>
           <mesh position={[halfWidth / 2, 0, 0]} geometry={halves[0]} {...interactive}>
             <meshStandardMaterial map={texture} roughness={0.85} />
@@ -167,7 +313,7 @@ export function Sign({ question, showQuestion, broken, highlight, answer = null,
           </mesh>
         </group>
       </group>
-      <group position={[halfWidth, 0, 0]}>
+      <group ref={rightEdge} position={[halfWidth, 0, 0]}>
         <group ref={right}>
           <mesh position={[-halfWidth / 2, 0, 0]} geometry={halves[1]} {...interactive}>
             <meshStandardMaterial map={texture} roughness={0.85} />
@@ -177,6 +323,7 @@ export function Sign({ question, showQuestion, broken, highlight, answer = null,
             <meshStandardMaterial color="#3b3220" roughness={1} />
           </mesh>
         </group>
+      </group>
       </group>
     </group>
   )

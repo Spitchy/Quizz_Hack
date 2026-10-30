@@ -3,7 +3,7 @@ import { useRef } from 'react'
 import { Vector3, type Group, type Mesh } from 'three'
 import { Arm, Ball, Limb } from './parts'
 import { createArmRig, poseArm } from './rig'
-import { lerp, twitch, type ArchetypeProps } from './anim'
+import { holdGrip, lerp, poseHeld, twitch, type ArchetypeProps } from './anim'
 
 // « Le Long » : silhouette noire filiforme, tête en œuf, yeux pâles.
 // Colère : le cou s'étire vers le plafond, la tête se tord d'un côté à l'autre
@@ -21,6 +21,7 @@ const GRIP_R = new Vector3(0.61, 0.06, 0.02)
 
 const target = new Vector3()
 const pole = new Vector3()
+const pose = new Vector3()
 
 export function TallMan({ look, motion, mats, sign }: ArchetypeProps) {
   const legL = useRef<Group>(null)
@@ -69,6 +70,7 @@ export function TallMan({ look, motion, mats, sign }: ArchetypeProps) {
     // Panneau : tenu à deux mains, levé et secoué à la colère.
     h.position.set(SIGN_AT.x + twitch(t * 9, 5) * 0.05 * anger, SIGN_AT.y + anger * 0.16, SIGN_AT.z + anger * 0.06)
     h.rotation.set(-anger * 0.2, 0, twitch(t * 8, 7) * 0.16 * anger)
+    poseHeld(h, m)
     h.updateMatrix()
 
     // Bras : les mains suivent les bords du panneau ; sans panneau, elles frappent.
@@ -76,14 +78,12 @@ export function TallMan({ look, motion, mats, sign }: ArchetypeProps) {
       [armL.current, GRIP_L, -1],
       [armR.current, GRIP_R, 1],
     ] as const) {
-      if (sign) {
-        target.copy(grip).applyMatrix4(h.matrix)
-      } else {
-        // Armé : mains au-dessus de la tête ; impact : abattues devant lui.
-        const raise = Math.max(0, -m.attack)
-        target.set(side * lerp(0.42, 0.22, raise), lerp(lerp(1.45, 2.7, raise), 1.25, strike), lerp(lerp(0.25, 0.05, raise), 0.95, strike))
-        target.x += Math.sin(t * 1.3 + side) * 0.03
-      }
+      // Armé : mains au-dessus de la tête ; impact : abattues devant lui.
+      const raise = Math.max(0, -m.attack)
+      pose.set(side * lerp(0.42, 0.22, raise), lerp(lerp(1.45, 2.55, raise), 1.25, strike), lerp(lerp(0.25, 0.05, raise), 0.95, strike))
+      pose.x += Math.sin(t * 1.3 + side) * 0.03
+      if (sign) holdGrip(target, grip, h, m, pose)
+      else target.copy(pose)
       pole.set(side * 0.9, 1.5, -0.5)
       poseArm(rig, target, pole)
     }

@@ -12,6 +12,7 @@ import { Disintegration } from './entities/Disintegration'
 import { sampleCloud, type ParticleCloud } from './entities/particles'
 import { FleshCluster } from './entities/FleshCluster'
 import { Mannequin } from './entities/Mannequin'
+import { breakFor, writeGesture } from './entities/signBreak'
 import {
   angerTarget,
   attackEnvelope,
@@ -114,6 +115,7 @@ export function Entity({
   const root = useRef<Group>(null)
   const body = useRef<Group>(null)
   const motion = useRef(initialMotion())
+  const breakStyle = useMemo(() => breakFor(look), [look])
   const [cloud, setCloud] = useState<ParticleCloud | null>(null)
 
   const mats = useMemo<EntityMaterials>(() => {
@@ -148,6 +150,8 @@ export function Entity({
     beatStart: 0,
     walked: 0,
     footfall: 0,
+    /** Instant de la mauvaise réponse : le geste qui détruit le panneau part de là. */
+    brokeAt: null as number | null,
     placed: false,
     springs: {
       look: { value: 0, velocity: 0 },
@@ -187,7 +191,9 @@ export function Entity({
     if (reaction !== st.reaction) {
       st.reaction = reaction
       st.reactionStart = t
+      if (reaction === 'wrong' && st.brokeAt === null) st.brokeAt = t
     }
+    writeGesture(m, breakStyle, st.brokeAt === null ? null : t - st.brokeAt)
     const since = t - st.reactionStart
     m.mood = render.mood === 'angry' ? 'angry' : render.mood === 'smiling' || defeat ? 'menace' : 'calm'
     m.angerSince = reaction === 'wrong' ? since : null

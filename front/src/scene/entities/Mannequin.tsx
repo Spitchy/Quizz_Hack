@@ -1,7 +1,7 @@
 import { useFrame } from '@react-three/fiber'
 import { useRef, type RefObject } from 'react'
 import { Vector3, type Group } from 'three'
-import { hash, stepped, type ArchetypeProps } from './anim'
+import { hash, holdGrip, poseHeld, stepped, type ArchetypeProps } from './anim'
 import { Arm, Ball, Limb } from './parts'
 import { createArmRig, poseArm } from './rig'
 
@@ -21,6 +21,7 @@ const GRIP_R = new Vector3(0.63, 0.04, 0.02)
 
 const target = new Vector3()
 const pole = new Vector3()
+const pose = new Vector3()
 
 function Hand({ material }: { material: ArchetypeProps['mats']['body'] }) {
   return <Ball position={[0, 0.03, 0]} radius={0.05} material={material} scale={[0.8, 1.2, 0.6]} />
@@ -68,6 +69,7 @@ export function Mannequin({ look, motion, mats, sign }: ArchetypeProps) {
     // Panneau tenu à deux mains ; il tressaute avec elle.
     h.position.set(SIGN_AT.x, SIGN_AT.y + (anger > 0 ? (hash(frame + 11) - 0.5) * 0.06 : 0), SIGN_AT.z)
     h.rotation.set(0, 0, anger > 0 ? (hash(frame + 5) - 0.5) * 0.12 * anger : 0)
+    poseHeld(h, m)
     h.updateMatrix()
 
     // Coudes : vers l'extérieur au repos ; déboîtés à l'envers (vers l'avant, le haut) à la colère.
@@ -77,15 +79,15 @@ export function Mannequin({ look, motion, mats, sign }: ArchetypeProps) {
       [armL.current, GRIP_L, -1],
       [armR.current, GRIP_R, 1],
     ] as const) {
-      if (sign) {
-        target.copy(grip).applyMatrix4(h.matrix)
-      } else if (side === 1) {
+      if (side === 1) {
         // Gifle : bras raide, armé loin sur le côté, puis balayé en travers devant lui.
         const k = Math.max(0, -slap)
-        target.set(0.75 - (m.attack > 0 ? m.attack * 1.1 : 0), 1.55 + k * 0.15, 0.45 + (m.attack > 0 ? m.attack * 0.4 : -k * 0.25))
+        pose.set(0.75 - (m.attack > 0 ? m.attack * 1.1 : 0), 1.55 + k * 0.15, 0.45 + (m.attack > 0 ? m.attack * 0.4 : -k * 0.25))
       } else {
-        target.set(-0.4, 1.15, 0.3)
+        pose.set(-0.4, 1.15, 0.3)
       }
+      if (sign) holdGrip(target, grip, h, m, pose)
+      else target.copy(pose)
       if (dislocate) pole.set(side * 0.1, 2.3, 1.2)
       else pole.set(side * 0.9, 1.3, -0.4)
       poseArm(rig, target, pole)

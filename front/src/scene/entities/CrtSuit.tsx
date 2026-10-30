@@ -2,7 +2,7 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import { CanvasTexture, MeshStandardMaterial, SRGBColorSpace, Vector3, type Group, type Mesh } from 'three'
 import { PALETTE } from '../layout'
-import { lerp, smoothNoise, twitch, type ArchetypeProps } from './anim'
+import { holdGrip, lerp, poseHeld, smoothNoise, twitch, type ArchetypeProps } from './anim'
 import { Arm, Ball, Limb } from './parts'
 import { createArmRig, poseArm } from './rig'
 
@@ -20,6 +20,7 @@ const HEADBUTT = 0.3
 
 const target = new Vector3()
 const pole = new Vector3()
+const pose = new Vector3()
 
 type ScreenMode = 'eye' | 'scream' | 'grin' | 'flash' | 'ghost'
 
@@ -152,18 +153,17 @@ export function CrtSuit({ look, motion, mats, sign, ghost }: ArchetypeProps) {
     // Le panneau tremble entre ses mains, qui ne le lâchent pas.
     h.position.set(SIGN_AT.x + smoothNoise(t * 24, 1) * 0.05 * anger, SIGN_AT.y + smoothNoise(t * 21, 2) * 0.04 * anger, SIGN_AT.z)
     h.rotation.set(smoothNoise(t * 25, 3) * 0.12 * anger, 0, smoothNoise(t * 19, 4) * 0.08 * anger)
+    poseHeld(h, m)
     h.updateMatrix()
     for (const [rig, grip, side] of [
       [armL.current, GRIP_L, -1],
       [armR.current, GRIP_R, 1],
     ] as const) {
-      if (sign) {
-        target.copy(grip).applyMatrix4(h.matrix)
-      } else {
-        // Sans panneau : bras ballants qui se raidissent, mains en avant pour l'agripper.
-        const grab = Math.max(butt, anger * 0.5)
-        target.set(side * lerp(0.36, 0.24, grab), lerp(1.0, 1.4, grab) + Math.sin(t * 2 + side) * 0.02, lerp(0.08, 0.6, grab))
-      }
+      // Sans panneau : bras ballants qui se raidissent, mains en avant pour l'agripper.
+      const grab = Math.max(butt, anger * 0.5)
+      pose.set(side * lerp(0.36, 0.24, grab), lerp(1.0, 1.4, grab) + Math.sin(t * 2 + side) * 0.02, lerp(0.08, 0.6, grab))
+      if (sign) holdGrip(target, grip, h, m, pose)
+      else target.copy(pose)
       pole.set(side * 0.9, 1.3, -0.5)
       poseArm(rig, target, pole)
     }

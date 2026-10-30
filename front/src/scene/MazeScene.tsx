@@ -12,6 +12,7 @@ import type { Circle } from '../maze/physics'
 import type { RadioSpot } from '../maze/radioSpot'
 import { Effects } from './Effects'
 import { entityLook, SIGN_HEIGHT, WALL_CLEARANCE, type EntityLook } from './entities/archetypes'
+import { breakFor } from './entities/signBreak'
 import { Entity, type DefeatRole, type Reaction } from './Entity'
 import { EYE_HEIGHT, PALETTE } from './layout'
 import { MazeWorld } from './MazeWorld'
@@ -107,6 +108,7 @@ interface EntitySlotProps {
   answer: number | null
   onHover?: (choice: number | null) => void
   onPick?: (choice: number) => void
+  maze: Maze
 }
 
 /**
@@ -133,6 +135,8 @@ const EntitySlot = memo(function EntitySlot(props: EntitySlotProps) {
             question={props.question}
             showQuestion={props.showQuestion}
             broken={props.broken}
+            breakStyle={breakFor(look)}
+            maze={props.maze}
             highlight={props.highlight}
             answer={props.answer}
             onHover={props.onHover}
@@ -279,7 +283,9 @@ function MazeContents(props: MazeSceneProps) {
             engaged={slot.engaged}
             reaction={reactionOf(p.id)}
             defeat={defeatRoles.get(p.id) ?? null}
-            holdsSign={!defeatStage}
+            // Défaite : celle qui vient d'être fâchée finit son geste, le temps du figement.
+            holdsSign={!defeatStage || (defeatStage === 'freeze' && slot.engaged)}
+            maze={maze}
             question={slot.engaged ? snapshot.question : null}
             showQuestion={slot.sign.showQuestion}
             broken={slot.sign.broken}

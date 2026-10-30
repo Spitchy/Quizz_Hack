@@ -1,14 +1,16 @@
 import { CanvasTexture, SRGBColorSpace, type Material, type MeshBasicMaterial } from 'three'
 import type { ReactNode, RefObject } from 'react'
+import type { Object3D, Vector3 } from 'three'
 import { PALETTE } from '../layout'
 import type { EntityLook } from './archetypes'
+import { restGesture, type SignGesture } from './signBreak'
 
 // État d'animation partagé entre `Entity` et les archétypes, et outils purs.
 
 export type Mood = 'calm' | 'angry' | 'menace'
 
 /** État d'animation écrit par `Entity` à chaque frame, lu par les archétypes. */
-export interface EntityMotion {
+export interface EntityMotion extends SignGesture {
   t: number
   mood: Mood
   /** Secondes depuis le début d'une colère fraîche (mauvaise réponse), sinon `null`. */
@@ -48,6 +50,7 @@ export const initialMotion = (): EntityMotion => ({
   walkPhase: 0,
   attack: 0,
   ghost: false,
+  ...restGesture(),
 })
 
 export interface EntityMaterials {
@@ -153,6 +156,25 @@ export function attackEnvelope(hits: readonly number[], since: number): number {
   if (after < 0.65) return 1 - ease((after - 0.14) / 0.51)
   if (before < 0.55) return -ease((0.55 - before) / 0.46)
   return 0
+}
+
+/** Ajoute le geste de rupture à la pose du panneau (avant `updateMatrix`). */
+export function poseHeld(held: Object3D, m: EntityMotion): void {
+  held.position.y += m.signLift
+  held.position.z += m.signPush
+  held.rotation.x += m.signTilt
+}
+
+/** Main sur le panneau, qui le serre ou le déchire, jusqu'à ce qu'elle le lâche et rejoigne `pose`. */
+export function holdGrip(out: Vector3, grip: Vector3, held: Object3D, m: EntityMotion, pose: Vector3): void {
+  if (m.free >= 1) {
+    out.copy(pose)
+    return
+  }
+  out.copy(grip)
+  out.x *= 1 - m.squeeze
+  out.applyMatrix4(held.matrix)
+  if (m.free > 0) out.lerp(pose, m.free)
 }
 
 /** Dents : croissant pâle et interstices, partagé par tous les monstres. */
