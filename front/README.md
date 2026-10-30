@@ -46,6 +46,24 @@ Disponibles avec `npm run dev` seulement, absents du build de production.
 | `__qhDefeat('wake')` | rejoue une étape de la défaite, une fois la partie perdue : `freeze`, `approach`, `beat`, `knockout`, `wake`, `inject`, `infected`, `over` |
 | `__qhPause(true)` | fige l'image pour l'inspecter, `__qhPause(false)` la relance |
 | `__qhScene`, `__qhGl` | la scène et le moteur de rendu Three.js, pour les inspecter |
+| `__qhAudio()` | l'état du son : moment, couches, niveaux, sons joués |
+| `__qhVoices()` | les voix du monde : néons et monstres qui sonnent, étouffement par les murs |
+
+## Le son
+
+Tout passe par `src/audio/`. Le jeu ne charge aucune bibliothèque audio : Web Audio, plus `AudioListener` et `PositionalAudio` de Three.js.
+
+- `mix.ts` : la balance de chaque moment du jeu et la réaction au danger. C'est ici qu'on règle les niveaux.
+- `cues.ts` : les sons datés de la mise en scène.
+- `recipes/` : les sons générés en code, calculés dans un worker au chargement.
+- `samples.ts` et `public/audio/` : les enregistrements, les répliques des monstres et la bande-son, crédités dans [`CREDITS.md`](public/audio/CREDITS.md). Un enregistrement remplace le son généré du même nom ; s'il manque, le son généré reste.
+- `engine.ts` : le graphe audio. `stage.ts` : le son dans le monde 3D. `useSoundDirector.ts` : du jeu vers le son.
+
+La musique vient de la radio posée au milieu du niveau (`maze/radioSpot.ts`, `scene/RadioCorner.tsx`) : elle monte quand on s'en approche et s'étouffe derrière les murs. Le journal sur sa table se lit avec `[E]`.
+
+Certains monstres hurlent avant de parler (`scream` dans `audio/spatial.ts`). Le geste qui détruit le panneau dépend du monstre : `scene/entities/signBreak.ts`.
+
+Dans le jeu, `[M]` coupe le son, `[-]` et `[+]` règlent le volume ; le réglage est mémorisé.
 
 ## Vérifications
 
