@@ -293,6 +293,21 @@ export function heartbeatBpm(danger: number): number {
   return 62 + 76 * clamp01(danger)
 }
 
+/**
+ * Écart avant le battement suivant (s). Un cœur n'est pas un métronome : chaque
+ * battement arrive un peu en avance ou en retard, et il en rate presque un de temps en temps.
+ */
+export function heartbeatInterval(danger: number, beat: number): number {
+  const base = 60 / heartbeatBpm(danger)
+  const hash = (n: number) => {
+    const s = Math.sin(n * 127.1 + 311.7) * 43758.5453
+    return s - Math.floor(s)
+  }
+  const drift = (hash(beat) - 0.5) * 0.14
+  const stumble = hash(beat + 0.5) > 0.92 ? 0.2 : 0
+  return base * (1 + drift + stumble)
+}
+
 /** Le bruit de fond monte passé le premier tiers de l'infection. */
 export function hazeGain(danger: number): number {
   const d = clamp01(danger)

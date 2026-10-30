@@ -98,8 +98,20 @@ export function release(rate: number, random: Random): Samples {
 
 // --- Danger ---------------------------------------------------------------------
 
-/** Battement de cœur : « poum » grave, « poum » plus court. Une pointe d'harmonique pour les petites enceintes. */
-export function heartbeat(rate: number): Samples {
+/** Quatre battements, jamais tout à fait les mêmes : l'écart, la force, la hauteur. */
+const HEARTBEATS = [
+  { gap: 0.145, tu: 0.5, pitch: 1 },
+  { gap: 0.16, tu: 0.44, pitch: 0.97 },
+  { gap: 0.135, tu: 0.56, pitch: 1.03 },
+  { gap: 0.172, tu: 0.47, pitch: 0.95 },
+] as const
+
+/**
+ * Battement de cœur : tu-TUN. Un petit coup sec, plus aigu, qui lance le grand
+ * coup grave, tout de suite après. Une pointe d'harmonique pour les petites enceintes.
+ */
+export function heartbeat(rate: number, _random: Random, variant: number): Samples {
+  const { gap, tu, pitch } = HEARTBEATS[variant]
   const out = alloc(0.62, rate)
   const thump = (at: number, level: number, tau: number, from: number) => {
     let phase = 0
@@ -109,8 +121,8 @@ export function heartbeat(rate: number): Samples {
       out[i] += softClip(Math.sin(TAU * phase) * 1.7) * hitEnv(t, 0.006, tau) * level
     }
   }
-  thump(0.01, 1, 0.075, 74)
-  thump(0.255, 0.68, 0.06, 82)
+  thump(0.01, tu, 0.03, 98 * pitch)
+  thump(0.01 + gap, 1, 0.105, 70 * pitch)
   return normalize(fadeEdges(out, rate, 0.001, 0.02), 0.95)
 }
 
@@ -340,7 +352,7 @@ export function gasp(rate: number, random: Random): Samples {
   return normalize(fadeEdges(out, rate, 0.005, 0.03))
 }
 
-/** Le journal qu'on prend ou qu'on repose : du papier sec qui froisse. */
+/** Le dossier qu'on prend ou qu'on repose : du papier sec qui froisse. */
 export function paper(rate: number, random: Random): Samples {
   const seconds = 0.42
   const out = alloc(seconds, rate)

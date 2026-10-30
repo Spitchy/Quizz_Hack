@@ -16,6 +16,7 @@ import {
   hazeGain,
   heartbeatBpm,
   heartbeatGain,
+  heartbeatInterval,
   LAYER_TRIM,
   LAYERS,
   MIXES,
@@ -25,7 +26,7 @@ import {
   volumeGain,
   type Moment,
 } from './mix'
-import { RECIPES } from './recipes'
+import { RECIPES, renderSound } from './recipes'
 import { SAMPLE_FILES, SOUNDTRACK } from './samples'
 import { DEFAULT_SETTINGS, loadSettings, saveSettings } from './settings'
 import { moodGain, moodRate, nearest, occlusionFor, VOICES, wallDepth } from './spatial'
@@ -149,6 +150,54 @@ describe('danger', () => {
   it('reste borné hors de 0..1', () => {
     expect(droneGain(5)).toBe(droneGain(1))
     expect(heartbeatBpm(-3)).toBe(heartbeatBpm(0))
+  })
+})
+
+describe('le cœur', () => {
+  /** La crête la plus forte entre deux instants (s). */
+  const peak = (samples: Float32Array, rate: number, from: number, to: number) => {
+    let max = 0
+    for (let i = Math.round(from * rate); i < Math.round(to * rate); i++) max = Math.max(max, Math.abs(samples[i]))
+    return max
+  }
+
+  it('bat tu-TUN : le premier coup, court et léger, lance le second, fort et grave', () => {
+    for (let variant = 0; variant < RECIPES.heartbeat.variants; variant++) {
+      const { samples, rate } = renderSound('heartbeat', variant)
+      const tu = peak(samples, rate, 0, 0.1)
+      const tun = peak(samples, rate, 0.13, 0.32)
+      expect(tu, `${variant}`).toBeGreaterThan(0.15)
+      expect(tun, `${variant}`).toBeGreaterThan(tu * 1.3)
+    }
+  })
+
+  it('enchaîne les deux coups de près, puis laisse le silence', () => {
+    for (let variant = 0; variant < RECIPES.heartbeat.variants; variant++) {
+      const { samples, rate } = renderSound('heartbeat', variant)
+      expect(peak(samples, rate, 0.58, 0.62), `${variant}`).toBeLessThan(0.05)
+    }
+  })
+
+  it('ne joue pas quatre fois le même battement', () => {
+    const a = Array.from(renderSound('heartbeat', 0).samples.subarray(0, 4000))
+    const b = Array.from(renderSound('heartbeat', 1).samples.subarray(0, 4000))
+    expect(a).not.toEqual(b)
+  })
+
+  it('n\u2019est pas un métronome, sans perdre son rythme', () => {
+    for (const danger of [0, 0.5, 1]) {
+      const intervals = Array.from({ length: 300 }, (_, beat) => heartbeatInterval(danger, beat))
+      const base = 60 / heartbeatBpm(danger)
+      const mean = intervals.reduce((sum, v) => sum + v, 0) / intervals.length
+      expect(new Set(intervals).size).toBeGreaterThan(100)
+      expect(Math.min(...intervals)).toBeGreaterThan(base * 0.9)
+      expect(Math.max(...intervals)).toBeLessThan(base * 1.3)
+      expect(Math.abs(mean - base)).toBeLessThan(base * 0.05)
+    }
+  })
+
+  it('a toujours fini ses deux coups avant le battement suivant, même au plus vite', () => {
+    expect(Math.min(...Array.from({ length: 300 }, (_, beat) => heartbeatInterval(1, beat)))).toBeGreaterThan(0.172 + 0.1)
   })
 })
 

@@ -6,7 +6,7 @@ import {
   DUCKS,
   breathGain,
   breathRate,
-  heartbeatBpm,
+  heartbeatInterval,
   hazeGain,
   heartbeatGain,
   LAYER_TRIM,
@@ -508,6 +508,7 @@ function applyDanger(g: Graph): void {
 // --- Cœur : planifié d'avance sur l'horloge audio. ---
 
 let nextBeat = 0
+let beatCount = 0
 function scheduleHeartbeat(g: Graph): void {
   const now = g.ctx.currentTime
   if (heartbeatGain(danger) <= 0) {
@@ -523,7 +524,7 @@ function scheduleHeartbeat(g: Graph): void {
       source.connect(g.heartLevel)
       source.start(nextBeat)
     }
-    nextBeat += 60 / heartbeatBpm(danger)
+    nextBeat += heartbeatInterval(danger, beatCount++)
   }
 }
 

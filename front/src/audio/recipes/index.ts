@@ -27,7 +27,7 @@ export const RECIPES = {
   'old-noise': recipe(MID, ambience.oldNoise),
   'neon-buzz': recipe(MID, ambience.neonBuzz),
   'step-carpet': recipe(MID, events.stepCarpet, 4),
-  heartbeat: recipe(LOW, events.heartbeat),
+  heartbeat: recipe(LOW, events.heartbeat, 4),
   'bed-crt': recipe(HI, monsters.bedCrt),
   'bed-mannequin': recipe(HI, monsters.bedMannequin),
   'bed-cluster': recipe(MID, monsters.bedCluster),
