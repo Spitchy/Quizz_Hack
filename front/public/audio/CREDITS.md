@@ -101,4 +101,4 @@ Même voix de synthèse, même réserve de licence. Fichier généré pour le je
 
 ## Générés en code
 
-Tout le reste est calculé par le jeu (`src/audio/recipes/`), sans fichier ni licence tierce : ambiance de la pièce, néons, drone, cœur, parasites, souffle de bande, souffle et craquements du disque, froissement du journal, acouphène, goutte de perfusion, présences des monstres, aiguille, piston, rire du médecin, glitchs, vent et herbe, pluie, moteur de la camionnette, pneus, porte coulissante, générique du flash, batte qui fend l'air. L'air que fredonne l'enfant est *Au clair de la lune*, du domaine public.
+Tout le reste est calculé par le jeu (`src/audio/recipes/`), sans fichier ni licence tierce : ambiance de la pièce, néons, drone, cœur, parasites, souffle de bande, souffle et craquements du disque, froissement du dossier, acouphène, goutte de perfusion, présences des monstres, aiguille, piston, rire du médecin, glitchs, vent et herbe, pluie, moteur de la camionnette, pneus, porte coulissante, générique du flash, batte qui fend l'air. L'air que fredonne l'enfant est *Au clair de la lune*, du domaine public.

@@ -49,7 +49,7 @@ export interface HudProps {
   signal: number
   /** Une entité est à portée : on peut lire son panneau. */
   canEngage: boolean
-  /** Le journal de la table est à portée. */
+  /** Le dossier sur la table est à portée. */
   canRead: boolean
   /** La souris pilote le regard (pointer lock actif). */
   mouseLook: boolean
@@ -68,7 +68,7 @@ export function Hud({ hud, snapshot, danger, signal, canEngage, canRead, mouseLo
 
   let hint: string | null = null
   if (exploring && canEngage) hint = '[E] LIRE LE PANNEAU'
-  else if (exploring && canRead) hint = '[E] LIRE LE JOURNAL'
+  else if (exploring && canRead) hint = '[E] OUVRIR LE DOSSIER'
   else if (exploring && !mouseLook) hint = '[ZQSD/FLÈCHES] AVANCER · [CLIC] REGARDER À LA SOURIS · [MAJ] COURIR'
   else if (exploring) hint = '[ZQSD] AVANCER · [MAJ] COURIR · [ÉCHAP] LIBÉRER LA SOURIS'
   else if (snapshot.phase === 'question' && !log) hint = '[1-4] RÉPONDRE · [↑↓] VISER · [ENTRÉE] VALIDER · [ÉCHAP] RECULER'

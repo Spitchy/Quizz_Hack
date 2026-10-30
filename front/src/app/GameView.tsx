@@ -15,7 +15,7 @@ import { mockCorrectAnswer } from '../api/mock'
 import { directionFromTurn, readMazeLayout, readShowAnswers } from './config'
 import type { DefeatStage, VictoryStage } from './sequence'
 import { Hud } from './Hud'
-import { NewspaperOverlay } from './Newspaper'
+import { VictimFileOverlay } from './FileOverlay'
 
 // Vue de jeu : labyrinthe 3D + HUD + saisie (déplacement, aborder une entité,
 // répondre sur son panneau). Chargée à la demande : c'est elle qui embarque Three.js.
@@ -78,7 +78,7 @@ export default function GameView({ game, snapshot, defeatStage, victoryStage, on
   const mouseLook = usePointerLocked()
   const [paperOpen, setPaperOpen] = useState(false)
   const canRead = phase === 'exploring' && !defeatStage && !victoryStage && canReachRadio(maze, radio, tile)
-  // S'il n'est plus à portée (la partie a pu changer), le journal se referme.
+  // S'il n'est plus à portée (la partie a pu changer), le dossier se referme.
   const reading = paperOpen && canRead
 
   const engage = useCallback((entity: number) => game.engage(entity), [game])
@@ -104,22 +104,36 @@ export default function GameView({ game, snapshot, defeatStage, victoryStage, on
     [game, question],
   )
 
+  // Le dossier s'ouvre : la souris sert à tourner les pages, et reprend le regard ensuite.
+  const pointerWas = useRef<Element | null>(null)
+  const openFile = useCallback(() => {
+    playSound('paper', { gain: 0.6 })
+    setPaperOpen(true)
+    pointerWas.current = document.pointerLockElement
+    if (pointerWas.current) document.exitPointerLock()
+  }, [])
+
+  const closeFile = useCallback(() => {
+    playSound('paper', { gain: 0.5, rate: 0.9 })
+    setPaperOpen(false)
+    void (pointerWas.current?.requestPointerLock?.() as Promise<void> | undefined)?.catch?.(() => {})
+    pointerWas.current = null
+  }, [])
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (phase === 'exploring') {
         if (reading) {
           if (e.code === 'KeyE' || e.key === 'Escape') {
             e.preventDefault()
-            playSound('paper', { gain: 0.5, rate: 0.9 })
-            setPaperOpen(false)
+            closeFile()
           }
         } else if (e.code === 'KeyE' && near !== null) {
           e.preventDefault()
           engage(near)
         } else if (e.code === 'KeyE' && canRead) {
           e.preventDefault()
-          playSound('paper', { gain: 0.6 })
-          setPaperOpen(true)
+          openFile()
         }
         return
       }
@@ -144,7 +158,7 @@ export default function GameView({ game, snapshot, defeatStage, victoryStage, on
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [phase, question, near, engage, answer, keyPick, hover, game, reading, canRead])
+  }, [phase, question, near, engage, answer, keyPick, hover, game, reading, canRead, openFile, closeFile])
 
   const highlight =
     phase === 'question'
@@ -182,7 +196,7 @@ export default function GameView({ game, snapshot, defeatStage, victoryStage, on
         canRead={canRead && near === null}
         mouseLook={mouseLook}
       />
-      {reading && <NewspaperOverlay />}
+      {reading && <VictimFileOverlay pseudo={snapshot.pseudo} />}
     </>
   )
 }

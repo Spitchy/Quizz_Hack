@@ -753,41 +753,63 @@
   outline-offset: 2px;
 }
 
-/* --- Le journal ------------------------------------------------------------ */
+/* --- Le dossier du médecin ------------------------------------------------- */
 
-/* Une page tenue trop près, un peu de travers, dans la pénombre. */
-.paper {
+.file {
   position: absolute;
   inset: 0;
   z-index: 12;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  grid-template-rows: 1fr auto;
   align-items: center;
-  justify-content: center;
-  gap: 0.6rem;
-  background: rgba(3, 3, 2, 0.86);
-  animation: paper-in 0.18s ease-out;
+  justify-items: center;
+  gap: 0.5rem 1.2rem;
+  background: rgba(3, 3, 2, 0.88);
+  perspective: 1400px;
 }
 
-.paper__page {
-  height: min(90vh, 1360px);
-  max-width: 94vw;
+.file__page {
+  height: min(89vh, 1360px);
+  max-width: 76vw;
   object-fit: contain;
-  transform: rotate(-1.1deg);
-  box-shadow: 0 0 80px rgba(0, 0, 0, 0.9);
-  filter: sepia(0.15) brightness(0.92);
+  transform: rotate(-0.8deg);
+  transform-origin: left center;
+  box-shadow: 0 0 80px rgba(0, 0, 0, 0.9), 6px 6px 0 #5b5038, 10px 10px 0 #3e3625;
+  filter: brightness(0.94);
 }
 
-.paper__hint {
-  margin: 0;
+.file__page--right { animation: file-turn-right 0.26s ease-out; }
+.file__page--left { animation: file-turn-left 0.26s ease-out; }
+
+@keyframes file-turn-right {
+  from { transform: rotate(-0.8deg) rotateY(-55deg); opacity: 0.4; }
+}
+
+@keyframes file-turn-left {
+  from { transform: rotate(-0.8deg) rotateY(55deg); opacity: 0.4; }
+}
+
+.file__turn {
+  width: 5rem;
+  height: 9rem;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--font-hud);
+  font-size: 6rem;
+  line-height: 1;
+  opacity: 0.55;
+  cursor: pointer;
+}
+
+.file__turn:hover:not(:disabled) { opacity: 1; color: var(--danger); }
+.file__turn:disabled { opacity: 0.08; cursor: default; }
+
+.file__hint {
+  grid-column: 1 / -1;
+  margin: 0 0 0.5rem;
   font-size: 1.1rem;
   letter-spacing: 0.15em;
   opacity: 0.65;
-}
-
-@keyframes paper-in {
-  from {
-    opacity: 0;
-    transform: translateY(14px);
-  }
 }

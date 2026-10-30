@@ -44,7 +44,7 @@ describe('radio', () => {
     expect(radioSpot(again)).toEqual(radioSpot(mazes[0][1]))
   })
 
-  it('laisse lire le journal seulement à côté de la table', () => {
+  it('laisse ouvrir le dossier seulement à côté de la table', () => {
     const maze = mazes[0][1]
     const spot = radioSpot(maze)!
     expect(canReachRadio(maze, spot, spot.tile)).toBe(true)

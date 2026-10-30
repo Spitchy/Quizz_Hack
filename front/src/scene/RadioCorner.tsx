@@ -1,16 +1,17 @@
 import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo, useRef } from 'react'
 import { CanvasTexture, Color, MeshStandardMaterial, SRGBColorSpace, type MeshBasicMaterial } from 'three'
-import { drawNewspaper, PAPER_HEIGHT, PAPER_WIDTH } from '../app/newspaperPage'
+import { drawFilePage, FILE_HEIGHT, FILE_WIDTH, filePages } from '../app/victimFile'
 import type { RadioSpot } from '../maze/radioSpot'
 import { neonFlicker } from './flicker'
 import { useFontReady } from './useFontReady'
 
 // Au milieu du niveau, oubliés là : une table, une vieille radio qui joue encore,
-// un journal et une tasse. Tout est monté avec le labyrinthe et ne bouge plus ;
+// le dossier du médecin et une tasse. Tout est monté avec le labyrinthe et ne bouge plus ;
 // la radio n'a pas de lumière propre : seul le cadran luit.
 
 const PAPER_SCALE = 0.6
+const COVER = filePages(null)[0]
 const DIAL = new Color('#ffb24a')
 
 function createMaterials() {
@@ -21,12 +22,13 @@ function createMaterials() {
     knob: new MeshStandardMaterial({ color: '#17110b', roughness: 0.35 }),
     cup: new MeshStandardMaterial({ color: '#b9b09a', roughness: 0.4 }),
     paper: new MeshStandardMaterial({ color: '#ffffff', roughness: 0.95 }),
+    sheets: new MeshStandardMaterial({ color: '#cbbf9f', roughness: 0.95 }),
   }
 }
 
-/** Redessine la page et la pose sur le papier (hors rendu React). */
+/** Redessine la couverture et la pose sur le dossier (hors rendu React). */
 function printPage(ctx: CanvasRenderingContext2D, texture: CanvasTexture, paper: MeshStandardMaterial) {
-  drawNewspaper(ctx, PAPER_SCALE)
+  drawFilePage(ctx, COVER, PAPER_SCALE)
   texture.needsUpdate = true
   paper.map = texture
   paper.needsUpdate = true
@@ -42,8 +44,8 @@ export function RadioCorner({ spot, dark }: RadioCornerProps) {
   const mats = useMemo(() => createMaterials(), [])
   const { texture, ctx } = useMemo(() => {
     const el = document.createElement('canvas')
-    el.width = PAPER_WIDTH * PAPER_SCALE
-    el.height = PAPER_HEIGHT * PAPER_SCALE
+    el.width = FILE_WIDTH * PAPER_SCALE
+    el.height = FILE_HEIGHT * PAPER_SCALE
     const page = new CanvasTexture(el)
     page.colorSpace = SRGBColorSpace
     return { texture: page, ctx: el.getContext('2d')! }
@@ -106,10 +108,15 @@ export function RadioCorner({ spot, dark }: RadioCornerProps) {
         ))}
       </group>
 
-      {/* Le journal, posé de travers, et une tasse froide. */}
-      <mesh position={[0.22, 0.762, 0.02]} rotation={[-Math.PI / 2, 0, -0.14]} material={mats.paper}>
-        <planeGeometry args={[0.4, (0.4 * PAPER_HEIGHT) / PAPER_WIDTH]} />
-      </mesh>
+      {/* Le dossier, posé de travers, des feuilles qui dépassent, et une tasse froide. */}
+      <group position={[0.22, 0.762, 0.02]} rotation={[0, -0.14, 0]}>
+        <mesh position={[0.006, 0.004, 0.004]} rotation={[0, 0.03, 0]} material={mats.sheets}>
+          <boxGeometry args={[0.31, 0.012, (0.31 * FILE_HEIGHT) / FILE_WIDTH]} />
+        </mesh>
+        <mesh position={[0, 0.0115, 0]} rotation={[-Math.PI / 2, 0, 0]} material={mats.paper}>
+          <planeGeometry args={[0.32, (0.32 * FILE_HEIGHT) / FILE_WIDTH]} />
+        </mesh>
+      </group>
       <mesh position={[-0.05, 0.795, 0.17]} material={mats.cup}>
         <cylinderGeometry args={[0.035, 0.03, 0.07, 14]} />
       </mesh>
