@@ -15,5 +15,11 @@ export const SAMPLE_FILES: Partial<Record<SoundName, readonly string[]>> = {
   leather: files('leather', 4),
   'door-latch': files('door-latch', 1),
   'door-creak': files('door-creak', 1),
-  'anger-cluster': files('anger-cluster', 1),
+  stinger: files('stinger', 3),
+  'anger-tall': files('anger-tall', 2),
+  'anger-mannequin': files('anger-mannequin', 2),
+  'anger-crawler': files('anger-crawler', 2),
+  'anger-child': files('anger-child', 2),
+  'anger-crt': files('anger-crt', 2),
+  'anger-cluster': files('anger-cluster', 2),
 }

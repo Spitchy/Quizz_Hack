@@ -1,6 +1,6 @@
 # Crédits audio
 
-Tous les enregistrements de ce dossier sont sous licence **CC0 1.0** (domaine public). Aucune attribution n'est exigée ; elle est donnée ici pour la traçabilité et par respect des auteurs.
+Les bruitages de ce dossier sont sous licence **CC0 1.0** (domaine public). Aucune attribution n'est exigée ; elle est donnée ici pour la traçabilité et par respect des auteurs. Les voix et la musique ont leurs propres conditions, détaillées plus bas.
 
 Chaque fichier a été converti depuis la source indiquée : mis en mono, rééchantillonné (24 ou 32 kHz), coupé après son dernier son audible, normalisé, en WAV 16 bits. `step-carpet-*` passe en plus dans un passe-bas à 1,1 kHz pour sonner comme de la moquette.
 
@@ -19,7 +19,6 @@ Chaque fichier a été converti depuis la source indiquée : mis en mono, rééc
 | `splat-1.wav` | `impsplat/impactsplat07.mp3.flac` | Independent.nu (déposé par qubodup) | [8 wet squish, slurp impacts](https://opengameart.org/content/8-wet-squish-slurp-impacts) | CC0 1.0 |
 | `splat-2.wav` | `impsplat/impactsplat08.mp3.flac` | Independent.nu (déposé par qubodup) | [8 wet squish, slurp impacts](https://opengameart.org/content/8-wet-squish-slurp-impacts) | CC0 1.0 |
 | `splat-3.wav` | `impsplat/impactsplat04.mp3.flac` | Independent.nu (déposé par qubodup) | [8 wet squish, slurp impacts](https://opengameart.org/content/8-wet-squish-slurp-impacts) | CC0 1.0 |
-| `anger-cluster-1.wav` | `impsplat/impactsplat05.mp3.flac` | Independent.nu (déposé par qubodup) | [8 wet squish, slurp impacts](https://opengameart.org/content/8-wet-squish-slurp-impacts) | CC0 1.0 |
 | `door-creak-1.wav` | `OGG/doorOpen_2.ogg` | Kenney (www.kenney.nl) | [50 RPG sound effects](https://opengameart.org/content/50-rpg-sound-effects) | CC0 1.0 |
 | `door-latch-1.wav` | `OGG/metalLatch.ogg` | Kenney (www.kenney.nl) | [50 RPG sound effects](https://opengameart.org/content/50-rpg-sound-effects) | CC0 1.0 |
 | `leather-1.wav` | `OGG/handleSmallLeather.ogg` | Kenney (www.kenney.nl) | [50 RPG sound effects](https://opengameart.org/content/50-rpg-sound-effects) | CC0 1.0 |
@@ -35,6 +34,39 @@ Chaque fichier a été converti depuis la source indiquée : mis en mono, rééc
 | `step-hard-3.wav` | `OGG/footstep06.ogg` | Kenney (www.kenney.nl) | [50 RPG sound effects](https://opengameart.org/content/50-rpg-sound-effects) | CC0 1.0 |
 | `step-hard-4.wav` | `OGG/footstep07.ogg` | Kenney (www.kenney.nl) | [50 RPG sound effects](https://opengameart.org/content/50-rpg-sound-effects) | CC0 1.0 |
 
+## Chocs des mauvaises réponses
+
+Mélanges faits pour le jeu : un grondement généré en code et des enregistrements transposés et saturés.
+
+| Fichier | Sources | Auteurs | Licence |
+| --- | --- | --- | --- |
+| `stinger-1.wav` | `monster-3.wav`, `qubodup-GhostMoan01.wav` | Ogrebane, qubodup | CC0 1.0 |
+| `stinger-2.wav` | `monster-13.wav`, `qubodup-GhostMoan04.wav` | Ogrebane, qubodup | CC0 1.0 |
+| `stinger-3.wav` | `monster-6.wav`, `qubodup-GhostMoan03.wav` | Ogrebane, qubodup | CC0 1.0 |
+
+Sources : [Monster Sound Effects 2](https://opengameart.org/content/monster-sound-effects-2), [Ghost Monster Voice Moaning & Growling](https://opengameart.org/content/ghost-monster-voice-moaning-growling).
+
+## Répliques des monstres
+
+Voix de synthèse, sans aucun enregistrement de voix fait pour le jeu. Générées hors ligne avec [Piper](https://github.com/OHF-voice/piper1-gpl) (outil GPL, utilisé seulement pour produire les fichiers, absent du jeu) et la voix [`fr_FR-gilles-low`](https://huggingface.co/rhasspy/piper-voices/tree/main/fr/fr_FR/gilles/low), puis transposées et déformées, mêlées aux sons CC0 ci-dessus.
+
+**Licence à surveiller.** La fiche du modèle indique des données CC0 pour la voix, mais aussi un affinage à partir de la voix américaine Ryan, dont les données sont sous [CC BY-NC-SA 4.0](https://huggingface.co/rhasspy/piper-voices/blob/main/en/en_US/ryan/low/MODEL_CARD). Par prudence, ces répliques sont traitées comme **CC BY-NC-SA 4.0 : usage non commercial, mêmes conditions de partage**. Si le jeu devenait commercial, il faudrait les remplacer.
+
+| Fichier | Réplique | Licence |
+| --- | --- | --- |
+| `anger-tall-1.wav` | Tu ne sortiras jamais. | CC BY-NC-SA 4.0 |
+| `anger-tall-2.wav` | Tu resteras ici. | CC BY-NC-SA 4.0 |
+| `anger-mannequin-1.wav` | Je te regarde. | CC BY-NC-SA 4.0 |
+| `anger-mannequin-2.wav` | Tu es déjà mort. | CC BY-NC-SA 4.0 |
+| `anger-crawler-1.wav` | Je te vois. | CC BY-NC-SA 4.0 |
+| `anger-crawler-2.wav` | Je suis derrière toi. | CC BY-NC-SA 4.0 |
+| `anger-child-1.wav` | Tu as perdu. | CC BY-NC-SA 4.0 |
+| `anger-child-2.wav` | Joue avec moi. | CC BY-NC-SA 4.0 |
+| `anger-crt-1.wav` | Sujet perdu. | CC BY-NC-SA 4.0 |
+| `anger-crt-2.wav` | Erreur fatale. | CC BY-NC-SA 4.0 |
+| `anger-cluster-1.wav` | Tu es à nous. | CC BY-NC-SA 4.0 |
+| `anger-cluster-2.wav` | Reste avec nous. | CC BY-NC-SA 4.0 |
+
 ## Générés en code
 
-Tout le reste est calculé par le jeu (`src/audio/recipes/`), sans fichier ni licence tierce : ambiance de la pièce, néons, drone, cœur, parasites, souffle de bande, souffle et craquements du disque, acouphène, respiration, goutte de perfusion, voix et présences des monstres, aiguille, piston, rire du médecin, glitchs, vent et herbe. L'air que fredonne l'enfant est *Au clair de la lune*, du domaine public.
+Tout le reste est calculé par le jeu (`src/audio/recipes/`), sans fichier ni licence tierce : ambiance de la pièce, néons, drone, cœur, parasites, souffle de bande, souffle et craquements du disque, acouphène, respiration, goutte de perfusion, présences des monstres, aiguille, piston, rire du médecin, glitchs, vent et herbe. L'air que fredonne l'enfant est *Au clair de la lune*, du domaine public.

@@ -265,14 +265,14 @@ describe('enregistrements', () => {
     for (const file of listed) {
       const line = credits.split('\n').find((l) => l.includes(`\`${file}\``))
       expect(line, file).toBeDefined()
-      expect(line, file).toContain('CC0 1.0')
+      expect(line, file).toMatch(/CC0 1\.0|CC BY-NC-SA 4\.0/)
     }
   })
 
   it('remplacent des sons du catalogue et restent légers', () => {
     for (const name of Object.keys(SAMPLE_FILES)) expect(RECIPES).toHaveProperty(name)
     const bytes = listed.reduce((sum, file) => sum + statSync(new URL(file, folder)).size, 0)
-    expect(bytes).toBeLessThan(1.5 * 1024 * 1024)
+    expect(bytes).toBeLessThan(2.5 * 1024 * 1024)
   })
 })
 

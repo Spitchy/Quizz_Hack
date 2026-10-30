@@ -47,7 +47,7 @@ export function useSoundDirector(snapshot: GameSnapshot, defeat: DefeatStage | n
       else playSound('release')
     } else {
       duck('stinger')
-      playSound('stinger', { gain: 0.95 })
+      playSound('stinger', { gain: 0.72 })
       if (engagedEntity !== null) playEntityAnger(engagedEntity)
     }
   }, [lastAnswer, engagedEntity])
